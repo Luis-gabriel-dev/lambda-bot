@@ -39,3 +39,14 @@ model GuildConfig {
   guildId      String  @id
   logChannelId String?
 }
+
+/// Cargos autorizados a usar um comando restrito, por servidor.
+model CommandPermission {
+  id      Int    @id @default(autoincrement())
+  guildId String
+  command String
+  roleId  String
+
+  @@unique([guildId, command, roleId])
+  @@index([guildId, command])
+}

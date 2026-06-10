@@ -2,7 +2,7 @@ import { Client, Interaction, MessageFlags } from 'discord.js';
 import { Event } from '../interfaces/Event';
 import { logger } from '../core/logger';
 import { errorEmbed } from '../utils/embeds';
-import { missingPermissionNames } from '../utils/permissions';
+import { resolveAccess } from '../services/permission.service';
 
 const event: Event<'interactionCreate'> = {
   name: 'interactionCreate',
@@ -13,15 +13,13 @@ const event: Event<'interactionCreate'> = {
         const command = client.commands.get(interaction.commandName);
         if (!command) return;
 
-        if (command.permissions?.length) {
-          if (!interaction.inGuild() || !interaction.memberPermissions?.has(command.permissions)) {
-            const missing = missingPermissionNames(interaction.memberPermissions, command.permissions);
-            await interaction.reply({
-              embeds: [errorEmbed(`Você não tem permissão para usar este comando.\nNecessário: \`${missing.join('`, `')}\``)],
-              flags: MessageFlags.Ephemeral
-            });
-            return;
-          }
+        const access = await resolveAccess(interaction, command);
+        if (!access.allowed) {
+          await interaction.reply({
+            embeds: [errorEmbed(access.reason ?? 'Você não pode usar este comando.')],
+            flags: MessageFlags.Ephemeral
+          });
+          return;
         }
 
         await command.execute(interaction);

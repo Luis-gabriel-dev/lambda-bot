@@ -1,6 +1,5 @@
 import {
   ChatInputCommandInteraction,
-  PermissionResolvable,
   SlashCommandBuilder,
   SlashCommandOptionsOnlyBuilder,
   SlashCommandSubcommandsOnlyBuilder
@@ -17,8 +16,11 @@ export type CommandData =
 export interface Command {
   /** Definição do slash command (nome, descrição, opções). */
   data: CommandData;
-  /** Permissões exigidas do membro. A checagem é feita em interactionCreate. */
-  permissions?: PermissionResolvable[];
+  /**
+   * Comando restrito: só o dono ou membros com um cargo autorizado (via /permissao)
+   * podem usar. Enquanto nenhum cargo for configurado no servidor, só o dono usa.
+   */
+  restricted?: boolean;
   /** Handlers de botões/modais/menus que pertencem a este comando (roteados por prefixo do customId). */
   components?: Component[];
   /** Lógica executada quando o comando é chamado. */

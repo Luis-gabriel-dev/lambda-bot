@@ -6,4 +6,6 @@ export interface Config {
   clientId: string;
   /** ID do servidor onde os comandos de guild são registrados. */
   guildId: string;
+  /** ID do dono do bot — bypassa todas as checagens de permissão. */
+  ownerId: string;
 }
