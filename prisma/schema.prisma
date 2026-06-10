@@ -1,0 +1,41 @@
+// Prisma schema — SQLite por padrão, troque o provider para "postgresql" no futuro
+// sem reescrever as queries. Rode `npm run db:push` após alterar este arquivo.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+/// Advertências (warns) aplicadas a um membro.
+model Warning {
+  id          Int      @id @default(autoincrement())
+  guildId     String
+  userId      String
+  moderatorId String
+  reason      String
+  createdAt   DateTime @default(now())
+
+  @@index([guildId, userId])
+}
+
+/// Mutes temporários, para o job de expiração reverter automaticamente.
+model Mute {
+  id        Int      @id @default(autoincrement())
+  guildId   String
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@unique([guildId, userId])
+  @@index([expiresAt])
+}
+
+/// Configuração por servidor (ex: canal de logs).
+model GuildConfig {
+  guildId      String  @id
+  logChannelId String?
+}

@@ -6,6 +6,14 @@
 # Dependências
 node_modules/
 
+# Build TypeScript
+dist/
+
+# Banco de dados SQLite (Prisma)
+prisma/*.db
+prisma/*.db-journal
+*.db
+
 # Logs
 logs/
 *.log
