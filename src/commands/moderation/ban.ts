@@ -5,15 +5,17 @@ import {
   SlashCommandBuilder
 } from 'discord.js';
 import { Command } from '../../interfaces/Command';
-import { errorEmbed, successEmbed } from '../../utils/embeds';
-import { checkHierarchy } from '../../services/moderation.service';
+import { errorEmbed, Palette, successEmbed } from '../../utils/embeds';
+import { buildPunishmentDM, checkHierarchy } from '../../services/moderation.service';
+import { isOwner } from '../../services/permission.service';
+import { archiveMessages, collectUserMessages, isAuditEnabled } from '../../services/audit.service';
 
 const command: Command = {
   data: new SlashCommandBuilder()
     .setName('ban')
     .setDescription('Bane um usuário do servidor.')
     .addUserOption((opt) => opt.setName('usuario').setDescription('Usuário a banir.').setRequired(true))
-    .addStringOption((opt) => opt.setName('motivo').setDescription('Motivo do banimento.').setRequired(false))
+    .addStringOption((opt) => opt.setName('motivo').setDescription('Motivo do banimento (obrigatório).').setRequired(false))
     .addIntegerOption((opt) =>
       opt
         .setName('apagar_dias')
@@ -42,11 +44,19 @@ const command: Command = {
       return;
     }
 
+    // Motivo obrigatório para todos, exceto o dono do bot.
+    const reasonInput = interaction.options.getString('motivo');
+    if (!isOwner(interaction.user.id) && !reasonInput?.trim()) {
+      await interaction.reply({
+        embeds: [errorEmbed('O **motivo** é obrigatório para banir.')],
+        flags: MessageFlags.Ephemeral
+      });
+      return;
+    }
+    const reason = reasonInput?.trim() || 'Sem motivo informado';
     const user = interaction.options.getUser('usuario', true);
-    const reason = interaction.options.getString('motivo') ?? 'Sem motivo informado';
     const deleteDays = interaction.options.getInteger('apagar_dias') ?? 0;
 
-    // O membro pode não estar no servidor (banir por ID ainda funciona).
     const member = await interaction.guild.members.fetch(user.id).catch(() => null);
     if (member) {
       const hierarchyError = checkHierarchy(interaction.member, member);
@@ -63,17 +73,29 @@ const command: Command = {
       }
     }
 
-    // Tenta avisar o usuário por DM antes de banir (depois do ban não há servidor em comum).
-    await user
-      .send(`Você foi **banido** de **${interaction.guild.name}**.\nMotivo: ${reason}`)
-      .catch(() => undefined);
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+
+    // Auditoria: arquiva as mensagens do usuário ANTES de banir (só se houver canal configurado).
+    if (await isAuditEnabled(interaction.guildId)) {
+      const messages = await collectUserMessages(interaction.guild, user.id);
+      await archiveMessages(interaction.guild, `Ban de ${user.tag}`, reason, messages);
+    }
+
+    const dm = buildPunishmentDM({
+      guildName: interaction.guild.name,
+      guildIcon: interaction.guild.iconURL({ size: 256 }),
+      action: 'banido',
+      color: Palette.error,
+      reason
+    });
+    await user.send({ embeds: [dm] }).catch(() => undefined);
 
     await interaction.guild.bans.create(user.id, {
       reason: `${interaction.user.tag}: ${reason}`,
       deleteMessageSeconds: deleteDays * 86_400
     });
 
-    await interaction.reply({
+    await interaction.editReply({
       embeds: [successEmbed(`🔨 **${user.tag}** foi banido.\nMotivo: ${reason}`)]
     });
   }

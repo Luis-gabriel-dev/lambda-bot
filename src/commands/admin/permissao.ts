@@ -6,7 +6,7 @@ import {
 } from 'discord.js';
 import { Command } from '../../interfaces/Command';
 import { errorEmbed, infoEmbed, successEmbed } from '../../utils/embeds';
-import { isOwner } from '../../services/permission.service';
+import { isAdminOrOwner } from '../../services/permission.service';
 import { commandPermissionRepository } from '../../repositories/commandPermission.repository';
 
 const command: Command = {
@@ -42,7 +42,7 @@ const command: Command = {
     }
 
     // Gate próprio: apenas o dono do bot ou administradores do servidor.
-    if (!isOwner(interaction.user.id) && !interaction.memberPermissions.has(PermissionFlagsBits.Administrator)) {
+    if (!isAdminOrOwner(interaction.user.id, interaction.memberPermissions)) {
       await interaction.reply({
         embeds: [errorEmbed('Apenas administradores podem configurar permissões.')],
         flags: MessageFlags.Ephemeral

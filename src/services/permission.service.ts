@@ -1,4 +1,4 @@
-import { ChatInputCommandInteraction } from 'discord.js';
+import { ChatInputCommandInteraction, PermissionFlagsBits, PermissionsBitField } from 'discord.js';
 import { config } from '../core/config';
 import { Command } from '../interfaces/Command';
 import { commandPermissionRepository } from '../repositories/commandPermission.repository';
@@ -6,6 +6,11 @@ import { commandPermissionRepository } from '../repositories/commandPermission.r
 /** É o dono do bot? (bypassa todas as checagens) */
 export function isOwner(userId: string): boolean {
   return userId === config.ownerId;
+}
+
+/** Pode mexer em configurações do servidor? (dono do bot ou administrador) */
+export function isAdminOrOwner(userId: string, memberPermissions: Readonly<PermissionsBitField> | null): boolean {
+  return isOwner(userId) || (memberPermissions?.has(PermissionFlagsBits.Administrator) ?? false);
 }
 
 export interface AccessResult {

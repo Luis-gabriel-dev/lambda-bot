@@ -40,6 +40,16 @@ model GuildConfig {
   logChannelId String?
 }
 
+/// Canais de log por tipo (bans, entrada, saída, ...) e por servidor.
+model LogChannel {
+  id        Int    @id @default(autoincrement())
+  guildId   String
+  type      String
+  channelId String
+
+  @@unique([guildId, type])
+}
+
 /// Cargos autorizados a usar um comando restrito, por servidor.
 model CommandPermission {
   id      Int    @id @default(autoincrement())

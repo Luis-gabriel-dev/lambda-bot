@@ -7,15 +7,15 @@ import {
 } from 'discord.js';
 import { Command } from '../../interfaces/Command';
 import { errorEmbed, Palette, successEmbed } from '../../utils/embeds';
-import { buildPunishmentDM, checkHierarchy } from '../../services/moderation.service';
+import { buildPunishmentDM } from '../../services/moderation.service';
 import { sendLog } from '../../services/log.service';
 
 const command: Command = {
   data: new SlashCommandBuilder()
-    .setName('kick')
-    .setDescription('Expulsa um membro do servidor.')
-    .addUserOption((opt) => opt.setName('usuario').setDescription('Membro a expulsar.').setRequired(true))
-    .addStringOption((opt) => opt.setName('motivo').setDescription('Motivo da expulsão.').setRequired(false)),
+    .setName('unmute')
+    .setDescription('Remove o silenciamento (timeout) de um membro.')
+    .addUserOption((opt) => opt.setName('usuario').setDescription('Membro a desmutar.').setRequired(true))
+    .addStringOption((opt) => opt.setName('motivo').setDescription('Motivo.').setRequired(false)),
 
   restricted: true,
 
@@ -28,9 +28,9 @@ const command: Command = {
       return;
     }
 
-    if (!interaction.appPermissions?.has(PermissionFlagsBits.KickMembers)) {
+    if (!interaction.appPermissions?.has(PermissionFlagsBits.ModerateMembers)) {
       await interaction.reply({
-        embeds: [errorEmbed('Eu não tenho a permissão **Expulsar Membros** neste servidor.')],
+        embeds: [errorEmbed('Eu não tenho a permissão **Moderar Membros** neste servidor.')],
         flags: MessageFlags.Ephemeral
       });
       return;
@@ -41,46 +41,34 @@ const command: Command = {
 
     const member = await interaction.guild.members.fetch(user.id).catch(() => null);
     if (!member) {
-      await interaction.reply({
-        embeds: [errorEmbed('Esse usuário não está no servidor.')],
-        flags: MessageFlags.Ephemeral
-      });
+      await interaction.reply({ embeds: [errorEmbed('Esse usuário não está no servidor.')], flags: MessageFlags.Ephemeral });
       return;
     }
 
-    const hierarchyError = checkHierarchy(interaction.member, member);
-    if (hierarchyError) {
-      await interaction.reply({ embeds: [errorEmbed(hierarchyError)], flags: MessageFlags.Ephemeral });
+    if (!member.isCommunicationDisabled()) {
+      await interaction.reply({ embeds: [errorEmbed('Esse membro não está silenciado.')], flags: MessageFlags.Ephemeral });
       return;
     }
 
-    if (!member.kickable) {
-      await interaction.reply({
-        embeds: [errorEmbed('Não consigo expulsar esse membro (o cargo dele está acima do meu).')],
-        flags: MessageFlags.Ephemeral
-      });
-      return;
-    }
+    await member.timeout(null, `${interaction.user.tag}: ${reason}`);
 
     const dm = buildPunishmentDM({
       guildName: interaction.guild.name,
       guildIcon: interaction.guild.iconURL({ size: 256 }),
-      action: 'expulso',
-      color: Palette.warning,
+      action: 'desmutado',
+      color: Palette.success,
       reason
     });
     await member.send({ embeds: [dm] }).catch(() => undefined);
 
-    await member.kick(`${interaction.user.tag}: ${reason}`);
-
     await interaction.reply({
-      embeds: [successEmbed(`👢 **${user.tag}** foi expulso.\nMotivo: ${reason}`)],
+      embeds: [successEmbed(`🔊 **${user.tag}** foi desmutado.`)],
       flags: MessageFlags.Ephemeral
     });
 
     const logEmbed = new EmbedBuilder()
-      .setColor(Palette.warning)
-      .setTitle('👢 Membro expulso')
+      .setColor(Palette.success)
+      .setTitle('🔊 Membro desmutado')
       .setThumbnail(user.displayAvatarURL({ size: 256 }))
       .addFields(
         { name: 'Usuário', value: `${user} \`${user.tag}\``, inline: true },

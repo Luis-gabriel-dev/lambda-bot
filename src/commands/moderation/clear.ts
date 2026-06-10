@@ -7,6 +7,7 @@ import {
 } from 'discord.js';
 import { Command } from '../../interfaces/Command';
 import { errorEmbed, successEmbed } from '../../utils/embeds';
+import { archiveMessages } from '../../services/audit.service';
 
 const BATCH = 100; // limite do Discord por chamada de bulkDelete
 const MAX_FETCH_PAGES = 50; // teto de segurança ao paginar com filtro de usuário (50 * 100 = 5000 msgs varridas)
@@ -53,6 +54,7 @@ const command: Command = {
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
     let deleted = 0;
+    const deletedMessages: Message[] = []; // capturadas para a auditoria
 
     if (target) {
       // Pagina o histórico coletando só as mensagens do alvo, até atingir `amount`.
@@ -73,6 +75,9 @@ const command: Command = {
 
       for (let i = 0; i < collected.length; i += BATCH) {
         const result = await channel.bulkDelete(collected.slice(i, i + BATCH), true);
+        result.forEach((m) => {
+          if (m && !m.partial) deletedMessages.push(m);
+        });
         deleted += result.size;
       }
     } else {
@@ -81,10 +86,23 @@ const command: Command = {
       while (remaining > 0) {
         const take = Math.min(BATCH, remaining);
         const result = await channel.bulkDelete(take, true);
+        result.forEach((m) => {
+          if (m && !m.partial) deletedMessages.push(m);
+        });
         deleted += result.size;
         if (result.size < take) break; // canal esvaziou ou bateu no limite de 14 dias
         remaining -= result.size;
       }
+    }
+
+    // Auditoria: salva o conteúdo apagado (no-op se não houver canal de auditoria configurado).
+    if (deletedMessages.length > 0) {
+      await archiveMessages(
+        channel.guild,
+        `/clear em #${channel.name}${target ? ` (${target.tag})` : ''}`,
+        `Limpeza por ${interaction.user.tag}`,
+        deletedMessages
+      );
     }
 
     const scope = target ? ` de ${target}` : '';
