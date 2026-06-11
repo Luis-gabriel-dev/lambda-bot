@@ -36,11 +36,33 @@ model WarnPenalty {
   @@index([resetAt])
 }
 
-/// Configuração geral por servidor (cargos automáticos de entrada).
+/// Configuração geral por servidor (cargos automáticos de entrada, categoria de tickets).
 model GuildConfig {
-  guildId    String  @id
-  autoRoleId String? // cargo dado a membros humanos ao entrar
-  botRoleId  String? // cargo dado a bots ao entrar
+  guildId          String  @id
+  autoRoleId       String? // cargo dado a membros humanos ao entrar
+  botRoleId        String? // cargo dado a bots ao entrar
+  ticketCategoryId String? // categoria onde os canais de ticket são criados
+}
+
+/// Ticket aberto (1 canal = 1 ticket).
+model Ticket {
+  id        Int      @id @default(autoincrement())
+  guildId   String
+  channelId String   @unique
+  openerId  String
+  type      String
+  createdAt DateTime @default(now())
+
+  @@index([guildId, openerId])
+}
+
+/// Cargos que podem ver/atender os tickets, por servidor.
+model TicketSupportRole {
+  id      Int    @id @default(autoincrement())
+  guildId String
+  roleId  String
+
+  @@unique([guildId, roleId])
 }
 
 /// Canais de log por tipo (bans, entrada, saída, ...) e por servidor.
