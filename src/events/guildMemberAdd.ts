@@ -1,12 +1,29 @@
-import { Client, EmbedBuilder } from 'discord.js';
+import { Client, EmbedBuilder, GuildMember, PermissionFlagsBits } from 'discord.js';
 import { Event } from '../interfaces/Event';
 import { Palette } from '../utils/embeds';
 import { discordTimestamp } from '../utils/formatter';
 import { sendLog } from '../services/log.service';
+import { guildConfigRepository } from '../repositories/guildConfig.repository';
+
+/** Atribui o cargo automático (membro ou bot) configurado para o servidor. */
+async function applyAutoRole(member: GuildMember): Promise<void> {
+  const config = await guildConfigRepository.get(member.guild.id);
+  const roleId = member.user.bot ? config?.botRoleId : config?.autoRoleId;
+  if (!roleId) return;
+
+  const me = member.guild.members.me;
+  const role = member.guild.roles.cache.get(roleId);
+  if (!role || !me?.permissions.has(PermissionFlagsBits.ManageRoles)) return;
+  if (me.roles.highest.comparePositionTo(role) <= 0) return; // cargo acima do meu
+
+  await member.roles.add(role).catch(() => undefined);
+}
 
 const event: Event<'guildMemberAdd'> = {
   name: 'guildMemberAdd',
   async execute(_client: Client, member) {
+    await applyAutoRole(member);
+
     const embed = new EmbedBuilder()
       .setColor(Palette.success)
       .setTitle('📥 Membro entrou')

@@ -20,7 +20,11 @@ export function createClient(): Client {
       GatewayIntentBits.GuildVoiceStates, // entrar/sair/mudar de call (log de calls)
       GatewayIntentBits.MessageContent // ler conteúdo de mensagens apagadas/editadas (privilegiado)
     ],
-    partials: [Partials.Channel, Partials.Message] // Message: receber delete/edit de mensagens fora do cache
+    partials: [
+      Partials.Channel,
+      Partials.Message, // receber delete/edit de mensagens fora do cache
+      Partials.GuildMember // receber guildMemberRemove de membros fora do cache (saída sempre logada)
+    ]
   });
 
   client.commands = new Collection<string, Command>();

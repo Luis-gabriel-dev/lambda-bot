@@ -36,10 +36,11 @@ model WarnPenalty {
   @@index([resetAt])
 }
 
-/// Configuração por servidor (ex: canal de logs).
+/// Configuração geral por servidor (cargos automáticos de entrada).
 model GuildConfig {
-  guildId      String  @id
-  logChannelId String?
+  guildId    String  @id
+  autoRoleId String? // cargo dado a membros humanos ao entrar
+  botRoleId  String? // cargo dado a bots ao entrar
 }
 
 /// Canais de log por tipo (bans, entrada, saída, ...) e por servidor.
