@@ -7,8 +7,9 @@ import {
 } from 'discord.js';
 import { Command } from '../../interfaces/Command';
 import { errorEmbed, Palette, successEmbed } from '../../utils/embeds';
-import { buildPunishmentDM } from '../../services/moderation.service';
+import { buildPunishmentDM, WARN_RESET_GRACE_MS } from '../../services/moderation.service';
 import { sendLog } from '../../services/log.service';
+import { warnPenaltyRepository } from '../../repositories/warnPenalty.repository';
 
 const command: Command = {
   data: new SlashCommandBuilder()
@@ -52,6 +53,15 @@ const command: Command = {
 
     await member.timeout(null, `${interaction.user.tag}: ${reason}`);
 
+    // Se era o mute automático por advertências, inicia o prazo de reset (7 dias) a partir de agora.
+    // O job de penalidades envia a DM avisando que o prazo começou.
+    const restartedCycle = await warnPenaltyRepository.rescheduleFromNow(
+      interaction.guildId,
+      user.id,
+      new Date(),
+      new Date(Date.now() + WARN_RESET_GRACE_MS)
+    );
+
     const dm = buildPunishmentDM({
       guildName: interaction.guild.name,
       guildIcon: interaction.guild.iconURL({ size: 256 }),
@@ -61,8 +71,11 @@ const command: Command = {
     });
     await member.send({ embeds: [dm] }).catch(() => undefined);
 
+    const extra = restartedCycle
+      ? '\nEra o silenciamento automático: o prazo de 7 dias para zerar as advertências começou agora.'
+      : '';
     await interaction.reply({
-      embeds: [successEmbed(`🔊 **${user.tag}** foi desmutado.`)],
+      embeds: [successEmbed(`🔊 **${user.tag}** foi desmutado.${extra}`)],
       flags: MessageFlags.Ephemeral
     });
 
@@ -76,7 +89,7 @@ const command: Command = {
         { name: 'Motivo', value: reason }
       )
       .setTimestamp();
-    await sendLog(interaction.guild, 'punicoes', logEmbed);
+    await sendLog(interaction.guild, 'moderacao', logEmbed); // revogar punição → #log-de-moderação
   }
 };
 

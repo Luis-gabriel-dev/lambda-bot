@@ -10,14 +10,17 @@ import { Command } from '../../interfaces/Command';
 import { errorEmbed, infoEmbed, Palette, successEmbed } from '../../utils/embeds';
 import {
   buildPunishmentDM,
+  buildWarnDM,
   checkHierarchy,
   WARN_BAN_THRESHOLD,
   WARN_MUTE_MS,
-  WARN_MUTE_THRESHOLD
+  WARN_MUTE_THRESHOLD,
+  WARN_RESET_GRACE_MS
 } from '../../services/moderation.service';
 import { isOwner } from '../../services/permission.service';
 import { sendLog } from '../../services/log.service';
 import { warningRepository } from '../../repositories/warning.repository';
+import { warnPenaltyRepository } from '../../repositories/warnPenalty.repository';
 import { discordTimestamp, truncate } from '../../utils/formatter';
 
 /**
@@ -45,23 +48,31 @@ async function escalate(
     });
     await user.send({ embeds: [dm] }).catch(() => undefined);
     await guild.bans.create(user.id, { reason }); // guildBanAdd loga no #log-de-bans
+    await warnPenaltyRepository.removeForUser(guild.id, user.id);
     return `atingiu ${total} advertências e foi **banido**`;
   }
 
   if (total === WARN_MUTE_THRESHOLD) {
     if (!member || !me?.permissions.has(PermissionFlagsBits.ModerateMembers) || !member.moderatable) return null;
     const reason = `Acúmulo de ${total} advertências`;
-    const until = new Date(Date.now() + WARN_MUTE_MS);
+    const muteEndsAt = new Date(Date.now() + WARN_MUTE_MS);
+    const resetAt = new Date(muteEndsAt.getTime() + WARN_RESET_GRACE_MS);
+
     const dm = buildPunishmentDM({
       guildName: guild.name,
       guildIcon: guild.iconURL({ size: 256 }),
       action: 'silenciado',
       color: Palette.warning,
-      reason,
-      until
+      reason: `Acúmulo de ${WARN_MUTE_THRESHOLD} advertências`,
+      until: muteEndsAt,
+      note:
+        `Após o fim do silenciamento, você terá **7 dias** sem novas advertências para que elas sejam **zeradas**. ` +
+        `Mas atenção: se receber **${WARN_MUTE_THRESHOLD}** advertências novamente, será **banido** do servidor.\n\n` +
+        `Evite quebrar as regras do servidor caso queira se manter nele.`
     });
     await user.send({ embeds: [dm] }).catch(() => undefined);
     await member.timeout(WARN_MUTE_MS, reason);
+    await warnPenaltyRepository.schedule(guild.id, user.id, muteEndsAt, resetAt);
 
     const logEmbed = new EmbedBuilder()
       .setColor(Palette.warning)
@@ -70,10 +81,10 @@ async function escalate(
       .addFields(
         { name: 'Usuário', value: `${user} \`${user.tag}\``, inline: true },
         { name: 'Motivo', value: reason, inline: true },
-        { name: 'Expira', value: discordTimestamp(until, 'R') }
+        { name: 'Expira', value: discordTimestamp(muteEndsAt, 'R') }
       )
       .setTimestamp();
-    await sendLog(guild, 'punicoes', logEmbed);
+    await sendLog(guild, 'punicoes', logEmbed); // mute É punição → #log-de-punições
     return `atingiu ${total} advertências e foi **silenciado por 1 dia**`;
   }
 
@@ -147,16 +158,16 @@ const command: Command = {
       await warningRepository.add(guildId, user.id, interaction.user.id, reason);
       const total = await warningRepository.count(guildId, user.id);
 
-      const warnDm = buildPunishmentDM({
+      const warnDm = buildWarnDM({
         guildName: interaction.guild.name,
         guildIcon: interaction.guild.iconURL({ size: 256 }),
-        action: 'advertido',
-        color: Palette.warning,
         reason,
-        note: `Ao acumular **${WARN_MUTE_THRESHOLD}** advertências você será silenciado por 1 dia, e ao atingir **${WARN_BAN_THRESHOLD}** será banido.`
+        total
       });
       await user.send({ embeds: [warnDm] }).catch(() => undefined);
 
+      const toMute = Math.max(0, WARN_MUTE_THRESHOLD - total);
+      const toBan = Math.max(0, WARN_BAN_THRESHOLD - total);
       const logEmbed = new EmbedBuilder()
         .setColor(Palette.warning)
         .setTitle('⚠️ Advertência aplicada')
@@ -164,11 +175,12 @@ const command: Command = {
         .addFields(
           { name: 'Usuário', value: `${user} \`${user.tag}\``, inline: true },
           { name: 'Moderador', value: `${interaction.user}`, inline: true },
-          { name: 'Total', value: `${total}`, inline: true },
+          { name: 'Total', value: `**${total}**`, inline: true },
+          { name: 'Progresso', value: `${toMute} até o silenciamento • ${toBan} até o banimento` },
           { name: 'Motivo', value: reason }
         )
         .setTimestamp();
-      await sendLog(interaction.guild, 'punicoes', logEmbed);
+      await sendLog(interaction.guild, 'moderacao', logEmbed); // warn → #log-de-moderação
 
       const escalation = await escalate(interaction, user, total);
       const summary = escalation
@@ -222,6 +234,7 @@ const command: Command = {
     if (sub === 'limpar') {
       const user = interaction.options.getUser('usuario', true);
       const count = await warningRepository.clear(guildId, user.id);
+      await warnPenaltyRepository.removeForUser(guildId, user.id);
       await interaction.reply({
         embeds: [
           count > 0

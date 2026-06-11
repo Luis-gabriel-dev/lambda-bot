@@ -22,16 +22,18 @@ model Warning {
   @@index([guildId, userId])
 }
 
-/// Mutes temporários, para o job de expiração reverter automaticamente.
-model Mute {
-  id        Int      @id @default(autoincrement())
-  guildId   String
-  userId    String
-  expiresAt DateTime
-  createdAt DateTime @default(now())
+/// Ciclo de penalidade por advertências: quando o mute (atingir 4 warns) acaba e
+/// quando as advertências devem ser zeradas (1 semana depois), com flag de aviso.
+model WarnPenalty {
+  id              Int      @id @default(autoincrement())
+  guildId         String
+  userId          String
+  muteEndsAt      DateTime
+  resetAt         DateTime
+  muteEndNotified Boolean  @default(false)
 
   @@unique([guildId, userId])
-  @@index([expiresAt])
+  @@index([resetAt])
 }
 
 /// Configuração por servidor (ex: canal de logs).

@@ -1,4 +1,5 @@
 import { EmbedBuilder, GuildMember } from 'discord.js';
+import { Palette } from '../utils/embeds';
 import { discordTimestamp } from '../utils/formatter';
 
 /**
@@ -24,7 +25,10 @@ export function checkHierarchy(executor: GuildMember, target: GuildMember): stri
 // ---- Escalonamento automático por advertências ----
 export const WARN_MUTE_THRESHOLD = 4;
 export const WARN_BAN_THRESHOLD = 8;
-export const WARN_MUTE_MS = 24 * 60 * 60 * 1000; // 1 dia
+export const WARN_MUTE_MS = 24 * 60 * 60 * 1000; // 1 dia de silenciamento
+export const WARN_RESET_GRACE_MS = 7 * 24 * 60 * 60 * 1000; // 1 semana após o mute para zerar
+
+const STAFF_FOOTER = 'Staff do Servidor';
 
 export interface PunishmentDmOptions {
   guildName: string;
@@ -47,6 +51,7 @@ export function buildPunishmentDM(o: PunishmentDmOptions): EmbedBuilder {
     .setColor(o.color)
     .setTitle(`Você foi ${o.action} em ${o.guildName}`)
     .addFields({ name: 'Motivo', value: o.reason }, { name: 'Quando', value: discordTimestamp(when, 'F') })
+    .setFooter({ text: STAFF_FOOTER, iconURL: o.guildIcon ?? undefined })
     .setTimestamp(when);
 
   if (o.guildIcon) embed.setThumbnail(o.guildIcon);
@@ -55,5 +60,51 @@ export function buildPunishmentDM(o: PunishmentDmOptions): EmbedBuilder {
   }
   if (o.note) embed.addFields({ name: '​', value: o.note });
 
+  return embed;
+}
+
+/** Embed genérico assinado pela "Staff do Servidor" (avisos do sistema na DM). */
+export function buildStaffEmbed(
+  guildName: string,
+  guildIcon: string | null,
+  opts: { title: string; description: string; color: number }
+): EmbedBuilder {
+  const embed = new EmbedBuilder()
+    .setColor(opts.color)
+    .setTitle(opts.title)
+    .setDescription(opts.description)
+    .setFooter({ text: STAFF_FOOTER, iconURL: guildIcon ?? undefined })
+    .setTimestamp();
+  if (guildIcon) embed.setThumbnail(guildIcon);
+  return embed;
+}
+
+/** DM enviada ao receber uma advertência, mostrando o estado atual e o que falta. */
+export function buildWarnDM(opts: { guildName: string; guildIcon: string | null; reason: string; total: number }): EmbedBuilder {
+  const { total } = opts;
+
+  let status: string;
+  if (total >= WARN_BAN_THRESHOLD) {
+    status = 'Você atingiu o limite de advertências e será **banido**.';
+  } else if (total >= WARN_MUTE_THRESHOLD) {
+    status = `Faltam **${WARN_BAN_THRESHOLD - total}** advertência(s) para o **banimento**.`;
+  } else {
+    status =
+      `Faltam **${WARN_MUTE_THRESHOLD - total}** advertência(s) para um **silenciamento de 1 dia** ` +
+      `e **${WARN_BAN_THRESHOLD - total}** para o **banimento**.`;
+  }
+
+  const embed = new EmbedBuilder()
+    .setColor(Palette.warning)
+    .setTitle(`Você recebeu uma advertência em ${opts.guildName}`)
+    .addFields(
+      { name: 'Motivo', value: opts.reason },
+      { name: 'Total de advertências', value: `**${total}**`, inline: true },
+      { name: 'Situação', value: status },
+      { name: '​', value: 'Evite quebrar as regras do servidor caso queira se manter nele.' }
+    )
+    .setFooter({ text: STAFF_FOOTER, iconURL: opts.guildIcon ?? undefined })
+    .setTimestamp();
+  if (opts.guildIcon) embed.setThumbnail(opts.guildIcon);
   return embed;
 }

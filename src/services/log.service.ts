@@ -10,7 +10,8 @@ export const LOG_TYPES = {
   mensagens: 'Mensagens',
   calls: 'Calls',
   tickets: 'Tickets',
-  audit: 'Auditoria de mensagens'
+  audit: 'Auditoria de mensagens',
+  moderacao: 'Moderação (warns, unmute, unban)'
 } as const;
 
 export type LogType = keyof typeof LOG_TYPES;
