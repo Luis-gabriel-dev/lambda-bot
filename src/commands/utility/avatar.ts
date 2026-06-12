@@ -1,6 +1,6 @@
-import { ChatInputCommandInteraction, EmbedBuilder, SlashCommandBuilder } from 'discord.js';
+import { ChatInputCommandInteraction, SlashCommandBuilder } from 'discord.js';
 import { Command } from '../../interfaces/Command';
-import { Palette } from '../../utils/embeds';
+import { buildAvatarEmbed } from '../../services/info.service';
 
 const command: Command = {
   data: new SlashCommandBuilder()
@@ -14,21 +14,7 @@ const command: Command = {
       ? await interaction.guild.members.fetch(user.id).catch(() => null)
       : null;
 
-    // GuildMember.displayAvatarURL prioriza o avatar específico do servidor, se houver.
-    const target = member ?? user;
-    const color = member && member.displayColor !== 0 ? member.displayColor : Palette.info;
-
-    const embed = new EmbedBuilder()
-      .setColor(color)
-      .setTitle(`Avatar de ${user.username}`)
-      .setImage(target.displayAvatarURL({ size: 1024 }))
-      .setDescription(
-        `[png](${target.displayAvatarURL({ size: 1024, extension: 'png' })}) · ` +
-          `[jpg](${target.displayAvatarURL({ size: 1024, extension: 'jpg' })}) · ` +
-          `[webp](${target.displayAvatarURL({ size: 1024, extension: 'webp' })})`
-      );
-
-    await interaction.reply({ embeds: [embed] });
+    await interaction.reply({ embeds: [buildAvatarEmbed(user, member)] });
   }
 };
 
