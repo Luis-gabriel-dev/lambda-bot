@@ -126,6 +126,37 @@ model PollVote {
   @@unique([pollId, userId])
 }
 
+/// Configuração do automod por servidor.
+model AutomodConfig {
+  guildId          String  @id
+  antiSpam         Boolean @default(false)
+  antiBigMessage   Boolean @default(false)
+  antiInvite       Boolean @default(false)
+  antiMassMention  Boolean @default(false)
+  antiForward      Boolean @default(false)
+  maxMessageLength Int     @default(600)
+  maxMentions      Int     @default(5)
+}
+
+/// Canais/categorias liberados de um módulo do automod (bigmessage/invite).
+model AutomodAllow {
+  id        Int    @id @default(autoincrement())
+  guildId   String
+  feature   String
+  channelId String
+
+  @@unique([guildId, feature, channelId])
+}
+
+/// Cargos isentos de todo o automod.
+model AutomodExemptRole {
+  id      Int    @id @default(autoincrement())
+  guildId String
+  roleId  String
+
+  @@unique([guildId, roleId])
+}
+
 /// Atividade de mensagens agregada por hora (para requisitos de sorteio).
 model MessageActivity {
   id         Int    @id @default(autoincrement())

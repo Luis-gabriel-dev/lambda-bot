@@ -1,6 +1,8 @@
-import { EmbedBuilder, GuildMember } from 'discord.js';
+import { EmbedBuilder, Guild, GuildMember, PermissionFlagsBits, User } from 'discord.js';
 import { Palette } from '../utils/embeds';
 import { discordTimestamp } from '../utils/formatter';
+import { sendLog } from './log.service';
+import { warnPenaltyRepository } from '../repositories/warnPenalty.repository';
 
 /**
  * Valida se `executor` pode moderar `target` pela hierarquia de cargos
@@ -107,4 +109,67 @@ export function buildWarnDM(opts: { guildName: string; guildIcon: string | null;
     .setTimestamp();
   if (opts.guildIcon) embed.setThumbnail(opts.guildIcon);
   return embed;
+}
+
+/**
+ * Aplica o escalonamento por advertências: ao atingir WARN_BAN_THRESHOLD → ban;
+ * ao atingir exatamente WARN_MUTE_THRESHOLD → silenciamento de 1 dia + agenda reset.
+ * Usado pelo /warn e pelo automod. Retorna um resumo do que foi aplicado, ou null.
+ */
+export async function escalateWarnings(guild: Guild, user: User, total: number): Promise<string | null> {
+  const me = guild.members.me;
+  const member = await guild.members.fetch(user.id).catch(() => null);
+
+  if (total >= WARN_BAN_THRESHOLD) {
+    if (!me?.permissions.has(PermissionFlagsBits.BanMembers) || (member && !member.bannable)) return null;
+    const reason = `Acúmulo de ${total} advertências`;
+    const dm = buildPunishmentDM({
+      guildName: guild.name,
+      guildIcon: guild.iconURL({ size: 256 }),
+      action: 'banido',
+      color: Palette.error,
+      reason
+    });
+    await user.send({ embeds: [dm] }).catch(() => undefined);
+    await guild.bans.create(user.id, { reason }); // guildBanAdd loga no #log-de-bans
+    await warnPenaltyRepository.removeForUser(guild.id, user.id);
+    return `atingiu ${total} advertências e foi **banido**`;
+  }
+
+  if (total === WARN_MUTE_THRESHOLD) {
+    if (!member || !me?.permissions.has(PermissionFlagsBits.ModerateMembers) || !member.moderatable) return null;
+    const reason = `Acúmulo de ${WARN_MUTE_THRESHOLD} advertências`;
+    const muteEndsAt = new Date(Date.now() + WARN_MUTE_MS);
+    const resetAt = new Date(muteEndsAt.getTime() + WARN_RESET_GRACE_MS);
+    const dm = buildPunishmentDM({
+      guildName: guild.name,
+      guildIcon: guild.iconURL({ size: 256 }),
+      action: 'silenciado',
+      color: Palette.warning,
+      reason,
+      until: muteEndsAt,
+      note:
+        `Após o fim do silenciamento, você terá **7 dias** sem novas advertências para que elas sejam **zeradas**. ` +
+        `Mas atenção: se receber **${WARN_MUTE_THRESHOLD}** advertências novamente, será **banido** do servidor.\n\n` +
+        `Evite quebrar as regras do servidor caso queira se manter nele.`
+    });
+    await user.send({ embeds: [dm] }).catch(() => undefined);
+    await member.timeout(WARN_MUTE_MS, reason);
+    await warnPenaltyRepository.schedule(guild.id, user.id, muteEndsAt, resetAt);
+
+    const logEmbed = new EmbedBuilder()
+      .setColor(Palette.warning)
+      .setTitle('🔇 Silenciado automaticamente')
+      .setThumbnail(user.displayAvatarURL({ size: 256 }))
+      .addFields(
+        { name: 'Usuário', value: `${user} \`${user.tag}\``, inline: true },
+        { name: 'Motivo', value: reason, inline: true },
+        { name: 'Expira', value: discordTimestamp(muteEndsAt, 'R') }
+      )
+      .setTimestamp();
+    await sendLog(guild, 'punicoes', logEmbed);
+    return `atingiu ${total} advertências e foi **silenciado por 1 dia**`;
+  }
+
+  return null;
 }

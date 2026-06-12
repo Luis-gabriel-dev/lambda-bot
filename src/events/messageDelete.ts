@@ -1,4 +1,13 @@
-import { AttachmentBuilder, AuditLogEvent, Client, EmbedBuilder, Guild, PermissionFlagsBits } from 'discord.js';
+import {
+  Attachment,
+  AttachmentBuilder,
+  AuditLogEvent,
+  Client,
+  Collection,
+  EmbedBuilder,
+  Guild,
+  PermissionFlagsBits
+} from 'discord.js';
 import { Event } from '../interfaces/Event';
 import { Palette } from '../utils/embeds';
 import { truncate } from '../utils/formatter';
@@ -8,7 +17,7 @@ const IMAGE_RE = /\.(png|jpe?g|gif|webp)$/i;
 
 /**
  * Tenta achar no audit log quem apagou a mensagem. Só registra quando OUTRA
- * pessoa (mod/admin) apaga — auto-deleção não aparece no audit log.
+ * pessoa (mod/admin/bot) apaga — auto-deleção não aparece no audit log.
  */
 async function findDeletion(guild: Guild, channelId: string, authorId?: string) {
   const me = guild.members.me;
@@ -59,9 +68,13 @@ const event: Event<'messageDelete'> = {
       ? `${entry.executor} \`${entry.executor.tag}\``
       : 'Provavelmente o próprio autor';
 
+    // Mensagens encaminhadas guardam o conteúdo original em messageSnapshots.
+    const snapshots = [...message.messageSnapshots.values()];
+    const isForward = snapshots.length > 0;
+
     const embed = new EmbedBuilder()
       .setColor(Palette.error)
-      .setTitle('🗑️ Mensagem apagada')
+      .setTitle(isForward ? '🗑️ Mensagem encaminhada apagada' : '🗑️ Mensagem apagada')
       .setThumbnail(message.author.displayAvatarURL({ size: 256 }))
       .addFields(
         { name: 'Autor', value: `${message.author} \`${message.author.tag}\``, inline: true },
@@ -71,21 +84,36 @@ const event: Event<'messageDelete'> = {
       )
       .setTimestamp();
 
-    // Re-upload dos anexos para preservá-los (as URLs do Discord expiram após a deleção).
+    // Re-upload de todos os anexos (próprios + encaminhados) para preservá-los.
     const files: AttachmentBuilder[] = [];
+    const names: string[] = [];
     let inlineImage: string | undefined;
-    for (const attachment of message.attachments.values()) {
-      const safeName = (attachment.name ?? 'arquivo').replace(/[^\w.\-]+/g, '_');
-      files.push(new AttachmentBuilder(attachment.url, { name: safeName }));
-      if (!inlineImage && (attachment.contentType?.startsWith('image/') || IMAGE_RE.test(attachment.name ?? ''))) {
-        inlineImage = `attachment://${safeName}`;
+    let index = 0;
+    const addAttachments = (attachments: Collection<string, Attachment>) => {
+      for (const attachment of attachments.values()) {
+        const base = (attachment.name ?? 'arquivo').replace(/[^\w.\-]+/g, '_');
+        const safeName = `${index++}-${base}`;
+        files.push(new AttachmentBuilder(attachment.url, { name: safeName }));
+        names.push(attachment.name ?? 'arquivo');
+        if (!inlineImage && (attachment.contentType?.startsWith('image/') || IMAGE_RE.test(attachment.name ?? ''))) {
+          inlineImage = `attachment://${safeName}`;
+        }
       }
+    };
+
+    addAttachments(message.attachments);
+
+    if (isForward) {
+      const forwardedText = snapshots
+        .map((snap) => snap.content)
+        .filter((content): content is string => Boolean(content))
+        .join('\n\n');
+      embed.addFields({ name: '📨 Encaminhamento (conteúdo original)', value: truncate(forwardedText || '*(sem texto)*', 1024) });
+      for (const snap of snapshots) addAttachments(snap.attachments);
     }
+
     if (files.length > 0) {
-      embed.addFields({
-        name: `Anexos (${files.length})`,
-        value: truncate(message.attachments.map((a) => a.name ?? 'arquivo').join(', '), 1024)
-      });
+      embed.addFields({ name: `Anexos (${files.length})`, value: truncate(names.join(', '), 1024) });
     }
     if (inlineImage) embed.setImage(inlineImage);
 
