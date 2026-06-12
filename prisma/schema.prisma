@@ -65,6 +65,49 @@ model TicketSupportRole {
   @@unique([guildId, roleId])
 }
 
+/// Sorteio (giveaway). 1 mensagem = 1 sorteio.
+model Giveaway {
+  id            Int             @id @default(autoincrement())
+  guildId       String
+  channelId     String
+  messageId     String          @unique
+  prize         String
+  winnerCount   Int             @default(1)
+  hostId        String
+  endsAt             DateTime
+  ended              Boolean         @default(false)
+  excludeRoleId      String? // cargo que NÃO pode participar
+  blockNitro         Boolean         @default(false) // bloqueia sinais de Nitro (best-effort)
+  minMessages        Int? // mínimo de mensagens exigidas
+  messageWindowHours Int? // janela (em horas) para contar as mensagens
+  requirement        String? // requisito em texto livre (exibido, não enforçado)
+  entries            GiveawayEntry[]
+
+  @@index([ended, endsAt])
+}
+
+/// Atividade de mensagens agregada por hora (para requisitos de sorteio).
+model MessageActivity {
+  id         Int    @id @default(autoincrement())
+  guildId    String
+  userId     String
+  hourBucket Int // epoch em horas (Date.now() / 3600000)
+  count      Int    @default(0)
+
+  @@unique([guildId, userId, hourBucket])
+  @@index([hourBucket])
+}
+
+/// Participação de um usuário em um sorteio.
+model GiveawayEntry {
+  id         Int      @id @default(autoincrement())
+  giveawayId Int
+  userId     String
+  giveaway   Giveaway @relation(fields: [giveawayId], references: [id], onDelete: Cascade)
+
+  @@unique([giveawayId, userId])
+}
+
 /// Canais de log por tipo (bans, entrada, saída, ...) e por servidor.
 model LogChannel {
   id        Int    @id @default(autoincrement())

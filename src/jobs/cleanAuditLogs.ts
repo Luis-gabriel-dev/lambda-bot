@@ -1,13 +1,19 @@
 import { Client } from 'discord.js';
 import { logChannelRepository } from '../repositories/logChannel.repository';
+import { currentHourBucket, messageActivityRepository } from '../repositories/messageActivity.repository';
 import { logger } from '../core/logger';
 
 const RETENTION_MS = 10 * 24 * 60 * 60 * 1000; // 10 dias
 const DAY_MS = 24 * 60 * 60 * 1000;
+const ACTIVITY_RETENTION_HOURS = 31 * 24; // mantém ~31 dias de atividade de mensagens
 
 /** Apaga, em cada canal de auditoria, os arquivos com mais de 10 dias. */
 async function runCleanup(client: Client): Promise<void> {
   const now = Date.now();
+
+  // Limpa atividade de mensagens antiga (global).
+  const removedActivity = await messageActivityRepository.pruneOlderThan(currentHourBucket() - ACTIVITY_RETENTION_HOURS);
+  if (removedActivity > 0) logger.info(`Atividade: ${removedActivity} bucket(s) antigos removidos.`);
 
   for (const guild of client.guilds.cache.values()) {
     const channelId = await logChannelRepository.getChannelId(guild.id, 'audit');
