@@ -185,7 +185,16 @@ export async function runAutomod(message: Message): Promise<void> {
   if (message.author.id === message.client.user.id || message.author.system) return;
 
   const config = await automodRepository.getConfig(message.guildId);
-  if (!config || (!config.antiSpam && !config.antiBigMessage && !config.antiInvite)) return;
+  if (
+    !config ||
+    (!config.antiSpam &&
+      !config.antiBigMessage &&
+      !config.antiInvite &&
+      !config.antiMassMention &&
+      !config.antiForward)
+  ) {
+    return;
+  }
 
   const member = message.member ?? (await message.guild.members.fetch(message.author.id).catch(() => null));
   const exemptRoleIds = await automodRepository.getExemptRoleIds(message.guildId);
@@ -243,6 +252,6 @@ export async function runAutomod(message: Message): Promise<void> {
     return;
   }
 
-  // 3) Spam / flood (pulado em canais/categorias liberados).
+  // 5) Spam / flood (pulado em canais/categorias liberados).
   if (config.antiSpam && !(await isChannelAllowed(message, 'spam'))) await checkSpam(message, member);
 }

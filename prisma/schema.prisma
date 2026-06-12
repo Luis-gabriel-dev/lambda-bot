@@ -157,6 +157,37 @@ model AutomodExemptRole {
   @@unique([guildId, roleId])
 }
 
+/// Canais de "mini Instagram" — vários por servidor, cada um com seu aviso.
+model InstagramChannel {
+  id                 Int     @id @default(autoincrement())
+  guildId            String
+  channelId          String  @unique
+  disclaimerImageUrl String? // imagem fixa do aviso desse canal
+}
+
+/// Post do mini Instagram (1 mensagem do bot = 1 post).
+model InstaPost {
+  id           Int         @id @default(autoincrement())
+  guildId      String
+  channelId    String
+  messageId    String      @unique
+  threadId     String?     @unique
+  authorId     String
+  commentCount Int         @default(0)
+  createdAt    DateTime    @default(now())
+  likes        InstaLike[]
+}
+
+/// Curtida em um post.
+model InstaLike {
+  id     Int       @id @default(autoincrement())
+  postId Int
+  userId String
+  post   InstaPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, userId])
+}
+
 /// Atividade de mensagens agregada por hora (para requisitos de sorteio).
 model MessageActivity {
   id         Int    @id @default(autoincrement())

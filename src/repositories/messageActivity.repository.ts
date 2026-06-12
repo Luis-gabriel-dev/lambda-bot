@@ -6,16 +6,42 @@ export function currentHourBucket(): number {
   return Math.floor(Date.now() / HOUR_MS);
 }
 
+interface BufferedActivity {
+  guildId: string;
+  userId: string;
+  hourBucket: number;
+  count: number;
+}
+
+// Buffer em memória — gravado em lote pelo flush (evita 1 upsert por mensagem).
+const buffer = new Map<string, BufferedActivity>();
+
 /** Atividade de mensagens agregada por hora (tabela MessageActivity). */
 export const messageActivityRepository = {
-  /** Registra +1 mensagem do usuário no bucket da hora atual. */
-  async record(guildId: string, userId: string): Promise<void> {
+  /** Acumula +1 mensagem no buffer (sem tocar no banco). */
+  record(guildId: string, userId: string): void {
     const hourBucket = currentHourBucket();
-    await prisma.messageActivity.upsert({
-      where: { guildId_userId_hourBucket: { guildId, userId, hourBucket } },
-      create: { guildId, userId, hourBucket, count: 1 },
-      update: { count: { increment: 1 } }
-    });
+    const key = `${guildId}:${userId}:${hourBucket}`;
+    const entry = buffer.get(key);
+    if (entry) entry.count += 1;
+    else buffer.set(key, { guildId, userId, hourBucket, count: 1 });
+  },
+
+  /** Grava o buffer acumulado no banco (chamado periodicamente). */
+  async flush(): Promise<void> {
+    if (buffer.size === 0) return;
+    const entries = [...buffer.values()];
+    buffer.clear();
+
+    for (const e of entries) {
+      await prisma.messageActivity
+        .upsert({
+          where: { guildId_userId_hourBucket: { guildId: e.guildId, userId: e.userId, hourBucket: e.hourBucket } },
+          create: { guildId: e.guildId, userId: e.userId, hourBucket: e.hourBucket, count: e.count },
+          update: { count: { increment: e.count } }
+        })
+        .catch(() => undefined);
+    }
   },
 
   /** Total de mensagens do usuário a partir de um bucket (inclusive). */

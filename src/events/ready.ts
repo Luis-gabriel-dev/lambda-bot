@@ -5,6 +5,9 @@ import { scheduleAuditCleanup } from '../jobs/cleanAuditLogs';
 import { scheduleWarnPenalties } from '../jobs/processWarnPenalties';
 import { scheduleGiveaways } from '../jobs/processGiveaways';
 import { schedulePolls } from '../jobs/processPolls';
+import { messageActivityRepository } from '../repositories/messageActivity.repository';
+
+const ACTIVITY_FLUSH_MS = 30_000; // grava o buffer de atividade a cada 30s
 
 const event: Event<'clientReady'> = {
   name: 'clientReady',
@@ -15,6 +18,7 @@ const event: Event<'clientReady'> = {
     scheduleWarnPenalties(readyClient);
     scheduleGiveaways(readyClient);
     schedulePolls(readyClient);
+    setInterval(() => void messageActivityRepository.flush(), ACTIVITY_FLUSH_MS);
   }
 };
 

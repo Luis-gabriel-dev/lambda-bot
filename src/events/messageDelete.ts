@@ -12,6 +12,8 @@ import { Event } from '../interfaces/Event';
 import { Palette } from '../utils/embeds';
 import { truncate } from '../utils/formatter';
 import { sendLog } from '../services/log.service';
+import { instagramRepository } from '../repositories/instagram.repository';
+import { handleThreadCommentsRemoved } from '../services/instagram.service';
 
 const IMAGE_RE = /\.(png|jpe?g|gif|webp)$/i;
 
@@ -36,9 +38,17 @@ async function findDeletion(guild: Guild, channelId: string, authorId?: string) 
 
 const event: Event<'messageDelete'> = {
   name: 'messageDelete',
-  async execute(_client: Client, message) {
+  async execute(client: Client, message) {
     const guild = message.guild;
     if (!guild) return;
+
+    // Comentário apagado numa thread de post → diminui o contador de comentários.
+    if (message.channel?.isThread()) {
+      await handleThreadCommentsRemoved(client, message.channelId, 1);
+    }
+
+    // Não loga deleções nos canais do mural de fotos (o bot reposta as fotos lá).
+    if (await instagramRepository.isInstaChannel(guild.id, message.channelId)) return;
 
     // ---- Mensagem fora do cache: sem conteúdo, mas dá pra logar se foi um mod ----
     if (message.partial) {
