@@ -4,6 +4,7 @@ import { logger } from '../core/logger';
 import { scheduleAuditCleanup } from '../jobs/cleanAuditLogs';
 import { scheduleWarnPenalties } from '../jobs/processWarnPenalties';
 import { scheduleGiveaways } from '../jobs/processGiveaways';
+import { schedulePolls } from '../jobs/processPolls';
 
 const event: Event<'clientReady'> = {
   name: 'clientReady',
@@ -13,6 +14,7 @@ const event: Event<'clientReady'> = {
     scheduleAuditCleanup(readyClient);
     scheduleWarnPenalties(readyClient);
     scheduleGiveaways(readyClient);
+    schedulePolls(readyClient);
   }
 };
 

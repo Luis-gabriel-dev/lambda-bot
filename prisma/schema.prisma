@@ -86,6 +86,46 @@ model Giveaway {
   @@index([ended, endsAt])
 }
 
+/// Enquete (votação com botões). 1 mensagem = 1 enquete.
+model Poll {
+  id        Int          @id @default(autoincrement())
+  guildId   String
+  channelId String
+  messageId String       @unique
+  question      String
+  color         Int?
+  imageUrl      String?
+  closed        Boolean      @default(false)
+  endsAt        DateTime? // auto-encerra quando passar (null = manual)
+  deleteAfterMs Int? // apagar a mensagem N ms após encerrar (null = nunca)
+  deleteAt      DateTime? // momento absoluto para apagar (definido ao encerrar)
+  createdAt     DateTime     @default(now())
+  options       PollOption[]
+  votes         PollVote[]
+}
+
+/// Opção de uma enquete.
+model PollOption {
+  id     Int    @id @default(autoincrement())
+  pollId Int
+  idx    Int
+  text   String
+  poll   Poll   @relation(fields: [pollId], references: [id], onDelete: Cascade)
+
+  @@unique([pollId, idx])
+}
+
+/// Voto de um usuário (1 voto por enquete = escolha única).
+model PollVote {
+  id     Int    @id @default(autoincrement())
+  pollId Int
+  userId String
+  idx    Int
+  poll   Poll   @relation(fields: [pollId], references: [id], onDelete: Cascade)
+
+  @@unique([pollId, userId])
+}
+
 /// Atividade de mensagens agregada por hora (para requisitos de sorteio).
 model MessageActivity {
   id         Int    @id @default(autoincrement())
