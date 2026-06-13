@@ -15,7 +15,9 @@ const MODULE_LABEL: Record<AutomodToggle, string> = {
   bigmessage: 'Anti-mensagens gigantes',
   invite: 'Anti-convites',
   massmention: 'Anti-menção em massa',
-  forward: 'Anti-encaminhamento'
+  forward: 'Anti-encaminhamento',
+  link: 'Anti-links',
+  gif: 'Anti-GIFs'
 };
 
 const command: Command = {
@@ -37,7 +39,9 @@ const command: Command = {
               { name: 'Mensagens gigantes', value: 'bigmessage' },
               { name: 'Convites', value: 'invite' },
               { name: 'Menção em massa', value: 'massmention' },
-              { name: 'Encaminhamento (forward)', value: 'forward' }
+              { name: 'Encaminhamento (forward)', value: 'forward' },
+              { name: 'Links', value: 'link' },
+              { name: 'GIFs', value: 'gif' }
             )
         )
         .addBooleanOption((opt) => opt.setName('ativo').setDescription('Ligar (true) ou desligar (false).').setRequired(true))
@@ -85,7 +89,9 @@ const command: Command = {
               { name: 'Convites', value: 'invite' },
               { name: 'Spam', value: 'spam' },
               { name: 'Menção em massa', value: 'massmention' },
-              { name: 'Encaminhamento (forward)', value: 'forward' }
+              { name: 'Encaminhamento (forward)', value: 'forward' },
+              { name: 'Links', value: 'link' },
+              { name: 'GIFs', value: 'gif' }
             )
         )
         .addChannelOption((opt) =>
@@ -116,7 +122,9 @@ const command: Command = {
               { name: 'Convites', value: 'invite' },
               { name: 'Spam', value: 'spam' },
               { name: 'Menção em massa', value: 'massmention' },
-              { name: 'Encaminhamento (forward)', value: 'forward' }
+              { name: 'Encaminhamento (forward)', value: 'forward' },
+              { name: 'Links', value: 'link' },
+              { name: 'GIFs', value: 'gif' }
             )
         )
         .addChannelOption((opt) => opt.setName('canal').setDescription('Canal ou categoria.').setRequired(true))
@@ -221,6 +229,12 @@ const command: Command = {
     const spamChannels = await automodRepository.getAllowedChannels(guildId, 'spam');
     const mentionChannels = await automodRepository.getAllowedChannels(guildId, 'massmention');
     const forwardChannels = await automodRepository.getAllowedChannels(guildId, 'forward');
+    const linkChannels = await automodRepository.getAllowedChannels(guildId, 'link');
+    const gifChannels = await automodRepository.getAllowedChannels(guildId, 'gif');
+    const whitelist = await automodRepository.getLinkWhitelist(guildId);
+    const blacklist = await automodRepository.getLinkBlacklist(guildId);
+    const linkMode = config?.linkMode === 'blacklist' ? 'blacklist' : 'whitelist';
+    const gifRoles = await automodRepository.getGifRoleIds(guildId);
     const list = (ids: string[], prefix: string) => (ids.length > 0 ? ids.map((id) => `${prefix}${id}>`).join(', ') : '*nenhum*');
 
     const lines = [
@@ -229,12 +243,16 @@ const command: Command = {
       `**Anti-convites:** ${on(config?.antiInvite)}`,
       `**Anti-menção em massa:** ${on(config?.antiMassMention)} — limite **${config?.maxMentions ?? 5}** menções`,
       `**Anti-encaminhamento:** ${on(config?.antiForward)}`,
+      `**Anti-links:** ${on(config?.antiLink)} — modo **${linkMode}** (${linkMode === 'blacklist' ? `${blacklist.length} bloqueado(s)` : `${whitelist.length} liberado(s)`})`,
+      `**Anti-GIFs:** ${on(config?.antiGif)} — cargos liberados: ${list(gifRoles, '<@&')}`,
       `**Cargos isentos:** ${list(exemptRoles, '<@&')}`,
       `**Liberado (gigantes):** ${list(bigChannels, '<#')}`,
       `**Liberado (convites):** ${list(inviteChannels, '<#')}`,
       `**Liberado (spam):** ${list(spamChannels, '<#')}`,
       `**Liberado (menções):** ${list(mentionChannels, '<#')}`,
-      `**Liberado (encaminhamento):** ${list(forwardChannels, '<#')}`
+      `**Liberado (encaminhamento):** ${list(forwardChannels, '<#')}`,
+      `**Liberado (links):** ${list(linkChannels, '<#')}`,
+      `**Liberado (GIFs):** ${list(gifChannels, '<#')}`
     ];
     await interaction.reply({ embeds: [infoEmbed(`**Automod**\n${lines.join('\n')}`)], flags: MessageFlags.Ephemeral });
   }

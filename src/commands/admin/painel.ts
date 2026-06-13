@@ -57,14 +57,6 @@ async function handlePanelButton(interaction: ButtonInteraction): Promise<void> 
               )
             );
     await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
-    return;
-  }
-
-  if (action === 'ping') {
-    await interaction.reply({
-      embeds: [infoEmbed(`🏓 WebSocket: \`${Math.round(interaction.client.ws.ping)}ms\``)],
-      flags: MessageFlags.Ephemeral
-    });
   }
 }
 
@@ -119,8 +111,7 @@ const command: Command = {
       new ButtonBuilder().setCustomId('painel:server').setLabel('Servidor').setEmoji('ℹ️').setStyle(ButtonStyle.Secondary),
       new ButtonBuilder().setCustomId('painel:perfil').setLabel('Meu perfil').setEmoji('👤').setStyle(ButtonStyle.Secondary),
       new ButtonBuilder().setCustomId('painel:avatar').setLabel('Meu avatar').setEmoji('🖼️').setStyle(ButtonStyle.Secondary),
-      new ButtonBuilder().setCustomId('painel:warns').setLabel('Advertências').setEmoji('⚠️').setStyle(ButtonStyle.Secondary),
-      new ButtonBuilder().setCustomId('painel:ping').setLabel('Ping').setEmoji('🏓').setStyle(ButtonStyle.Secondary)
+      new ButtonBuilder().setCustomId('painel:warns').setLabel('Advertências').setEmoji('⚠️').setStyle(ButtonStyle.Secondary)
     );
 
     await interaction.channel.send({ embeds: [embed], components: [row] });

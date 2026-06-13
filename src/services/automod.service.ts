@@ -31,10 +31,109 @@ const BIGMSG_WINDOW_MS = 15 * 60 * 1000; // janela de contagem
 // Menções em massa.
 const MASS_MENTION_MUTE_MS = 60_000; // 1 min
 
+// Links (anti-link com whitelist).
+const LINK_WARN_AT = 4; // 4ª ocorrência → advertência
+const LINK_MUTE_AT = 5; // 5ª+ → mute de 1h
+const LINK_MUTE_MS = 60 * 60 * 1000; // 1 hora
+const LINK_OFFENSE_RESET_MS = 10 * 60 * 1000; // ocorrências zeram após 10 min
+
 function countMentions(content: string): number {
   const ids = content.match(/<@[!&]?\d+>/g)?.length ?? 0;
   const everyoneHere = content.match(/@(?:everyone|here)/g)?.length ?? 0;
   return ids + everyoneHere;
+}
+
+// Detecção de links: URLs com esquema/www, ou domínios "nus" com TLD.
+const LINK_RE = /(?:https?:\/\/|www\.)[^\s<>]+|(?<![@\w.])(?:[a-z0-9-]+\.)+[a-z]{2,24}(?:[/:?#][^\s<>]*)?/gi;
+// Extensões de arquivo comuns — para não confundir "arquivo.png", "index.html" com link.
+const FILE_EXT = new Set([
+  'js', 'ts', 'jsx', 'tsx', 'json', 'html', 'htm', 'css', 'scss', 'sass', 'txt', 'md', 'py', 'rb', 'go', 'rs', 'java', 'kt',
+  'c', 'cpp', 'h', 'hpp', 'cs', 'php', 'sh', 'bat', 'ps1', 'yml', 'yaml', 'xml', 'toml', 'ini', 'env', 'lock', 'png', 'jpg',
+  'jpeg', 'gif', 'webp', 'svg', 'bmp', 'ico', 'mp3', 'wav', 'ogg', 'mp4', 'mov', 'avi', 'mkv', 'webm', 'zip', 'rar', '7z',
+  'tar', 'gz', 'exe', 'dll', 'msi', 'apk', 'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'csv', 'sql', 'db', 'log'
+]);
+
+/** Normaliza um domínio (tira esquema, www, caminho e porta). Retorna null se inválido. */
+export function normalizeDomain(input: string): string | null {
+  let s = input.trim().toLowerCase();
+  s = s.replace(/^https?:\/\//, '').replace(/^www\./, '');
+  s = s.split(/[/?#]/)[0]!.split(':')[0]!;
+  return /^[a-z0-9-]+(?:\.[a-z0-9-]+)+$/.test(s) ? s : null;
+}
+
+/** Extrai os domínios (hosts) dos links de uma mensagem, ignorando nomes de arquivo. */
+function extractHosts(content: string): string[] {
+  const matches = content.match(LINK_RE);
+  if (!matches) return [];
+  const hosts: string[] = [];
+  for (const token of matches) {
+    const hadScheme = /^(?:https?:\/\/|www\.)/i.test(token);
+    let host = token.toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '');
+    host = host.split(/[/?#]/)[0]!.split(':')[0]!;
+    if (!host.includes('.')) continue;
+    if (!hadScheme && FILE_EXT.has(host.split('.').pop()!)) continue; // parece nome de arquivo
+    hosts.push(host);
+  }
+  return hosts;
+}
+
+/** Retorna o domínio da lista que corresponde ao host (igual ou subdomínio), ou null. */
+function matchDomain(host: string, domains: string[]): string | null {
+  for (const domain of domains) if (host === domain || host.endsWith(`.${domain}`)) return domain;
+  return null;
+}
+
+type LinkCheck =
+  | { type: 'ok' }
+  | { type: 'blocked' } // há um link fora de qualquer lista permitida
+  | { type: 'wrongChannel'; domain: string; channelIds: string[] }; // permitido, mas não neste canal
+
+interface LinkRules {
+  roleDomains: string[]; // domínios liberados pelos cargos do membro (valem em qualquer canal)
+  globalDomains: string[]; // whitelist global
+  domainChannels: Map<string, string[]>; // domínio → canais onde é permitido (subconjunto da whitelist)
+  channelId: string;
+  parentId: string | null;
+}
+
+/** Avalia os links da mensagem. "blocked" tem prioridade sobre "wrongChannel". */
+function checkLinks(content: string, rules: LinkRules): LinkCheck {
+  let wrong: { domain: string; channelIds: string[] } | null = null;
+  for (const host of extractHosts(content)) {
+    if (matchDomain(host, rules.roleDomains)) continue; // cargo libera em qualquer canal
+    const domain = matchDomain(host, rules.globalDomains);
+    if (!domain) return { type: 'blocked' };
+    const channels = rules.domainChannels.get(domain);
+    if (channels && channels.length > 0) {
+      const here = channels.includes(rules.channelId) || (rules.parentId !== null && channels.includes(rules.parentId));
+      if (!here && !wrong) wrong = { domain, channelIds: channels };
+    }
+  }
+  return wrong ? { type: 'wrongChannel', ...wrong } : { type: 'ok' };
+}
+
+/** Há na mensagem algum link cujo domínio está na blacklist? */
+function hasBlacklistedLink(content: string, blacklist: string[]): boolean {
+  if (blacklist.length === 0) return false;
+  return extractHosts(content).some((host) => matchDomain(host, blacklist) !== null);
+}
+
+/** Sufixo do aviso conforme a ocorrência (3ª avisa, 4ª warn, 5ª+ mute). */
+function linkOffenseSuffix(offense: number): string {
+  if (offense === LINK_WARN_AT - 1) return '\n⚠️ Se mandar de novo, na próxima você receberá uma **advertência**.';
+  if (offense === LINK_WARN_AT) return '\nVocê recebeu uma **advertência**.';
+  if (offense >= LINK_MUTE_AT) return '\nVocê foi **silenciado por 1 hora**.';
+  return '';
+}
+
+// GIFs: links de tenor/giphy/gfycat, URLs .gif/.gifv, anexos .gif ou embeds gifv.
+const GIF_RE = /\b(?:tenor\.com|giphy\.com|gfycat\.com)\b|https?:\/\/\S+\.gifv?\b/i;
+function messageHasGif(message: Message<true>): boolean {
+  if (GIF_RE.test(message.content)) return true;
+  for (const attachment of message.attachments.values()) {
+    if ((attachment.contentType ?? '').startsWith('image/gif') || /\.gifv?$/i.test(attachment.name ?? '')) return true;
+  }
+  return message.embeds.some((embed) => embed.data.type === 'gifv');
 }
 
 /** É um encaminhamento vindo de FORA (outro servidor ou DM)? Forwards do próprio servidor são liberados. */
@@ -53,6 +152,21 @@ interface SpamState {
   lastOffense: number;
 }
 const spamMap = new Map<string, SpamState>();
+const linkOffenseMap = new Map<string, { count: number; last: number }>();
+
+/** Conta ocorrências de link não permitido por usuário (com janela de reset). */
+function registerLinkOffense(message: Message<true>): number {
+  const key = `${message.guildId}:${message.author.id}`;
+  const now = Date.now();
+  const state = linkOffenseMap.get(key);
+  if (!state || now - state.last > LINK_OFFENSE_RESET_MS) {
+    linkOffenseMap.set(key, { count: 1, last: now });
+    return 1;
+  }
+  state.count += 1;
+  state.last = now;
+  return state.count;
+}
 
 /** "Assinatura" de figurinhas/anexos da mensagem (null se for só texto). */
 function mediaSignature(message: Message<true>): string | null {
@@ -117,6 +231,42 @@ async function applyMuteWarn(
   const log = new EmbedBuilder()
     .setColor(Palette.warning)
     .setTitle(opts.logTitle)
+    .setThumbnail(message.author.displayAvatarURL({ size: 256 }))
+    .addFields({ name: 'Usuário', value: `${message.author} \`${message.author.tag}\``, inline: true }, ...fields)
+    .setTimestamp();
+  await sendLog(message.guild, 'punicoes', log);
+}
+
+/** Penalidade do anti-link: warn na 4ª ocorrência, warn + mute de 1h na 5ª+. */
+async function applyLinkPenalty(message: Message<true>, member: GuildMember | null, offenseCount: number): Promise<void> {
+  const reason = 'Links não permitidos (automod)';
+  await warningRepository.add(message.guildId, message.author.id, message.client.user.id, reason).catch(() => undefined);
+  const total = await warningRepository.count(message.guildId, message.author.id).catch(() => 0);
+  const escalation = await escalateWarnings(message.guild, message.author, total).catch(() => null);
+
+  const fields: APIEmbedField[] = [{ name: 'Ocorrência', value: `${offenseCount}ª`, inline: true }];
+  if (escalation) {
+    fields.push({ name: 'Escalonamento', value: `${total} advertências — ${escalation}` });
+  } else if (offenseCount >= LINK_MUTE_AT && member?.moderatable) {
+    const until = new Date(Date.now() + LINK_MUTE_MS);
+    await member.timeout(LINK_MUTE_MS, reason).catch(() => undefined);
+    const dm = buildPunishmentDM({
+      guildName: message.guild.name,
+      guildIcon: message.guild.iconURL({ size: 256 }),
+      action: 'silenciado',
+      color: Palette.warning,
+      reason,
+      until
+    });
+    await member.send({ embeds: [dm] }).catch(() => undefined);
+    fields.push({ name: 'Punição', value: 'mute de 1h', inline: true });
+  } else {
+    fields.push({ name: 'Punição', value: 'advertência', inline: true });
+  }
+
+  const log = new EmbedBuilder()
+    .setColor(Palette.warning)
+    .setTitle('🤖 Automod: link não permitido')
     .setThumbnail(message.author.displayAvatarURL({ size: 256 }))
     .addFields({ name: 'Usuário', value: `${message.author} \`${message.author.tag}\``, inline: true }, ...fields)
     .setTimestamp();
@@ -214,7 +364,9 @@ export async function runAutomod(message: Message): Promise<void> {
       !config.antiBigMessage &&
       !config.antiInvite &&
       !config.antiMassMention &&
-      !config.antiForward)
+      !config.antiForward &&
+      !config.antiLink &&
+      !config.antiGif)
   ) {
     return;
   }
@@ -235,13 +387,83 @@ export async function runAutomod(message: Message): Promise<void> {
     return;
   }
 
-  // 2) Encaminhamento (forward) de fora (outro servidor/DM) → apaga. Forwards internos são liberados.
+  // 2) GIFs restritos a cargos (ex.: booster). Roda quando o anti-GIF OU o anti-link está ligado,
+  //    para que quem tem cargo liberado de GIF nunca seja barrado pelo anti-link.
+  if ((config.antiGif || config.antiLink) && messageHasGif(message)) {
+    const channelOk = await isChannelAllowed(message, 'gif');
+    const gifRoles = channelOk ? [] : await automodRepository.getGifRoleIds(message.guildId);
+    const allowed = channelOk || (!!member && gifRoles.some((id) => member.roles.cache.has(id)));
+    if (config.antiGif && !allowed) {
+      await deleteWithNotice(message, 'apenas membros com cargo autorizado podem enviar GIFs aqui.');
+      return;
+    }
+    if (allowed) return; // pode enviar GIF → não deixa o anti-link reprocessar o link do GIF
+    // (anti-GIF desligado e sem permissão → segue para o anti-link, tratado como link comum)
+  }
+
+  // 3) Anti-link. Dois modos: "blacklist" (libera tudo, bloqueia a lista) ou
+  //    "whitelist" (bloqueia tudo, libera whitelist global + cargos + canais).
+  if (config.antiLink && !(await isChannelAllowed(message, 'link'))) {
+    if (config.linkMode === 'blacklist') {
+      const blacklist = await automodRepository.getLinkBlacklist(message.guildId);
+      if (hasBlacklistedLink(message.content, blacklist)) {
+        const offense = registerLinkOffense(message);
+        await deleteWithNotice(message, `esse link está na lista de **bloqueados** deste servidor.${linkOffenseSuffix(offense)}`);
+        if (offense >= LINK_WARN_AT) await applyLinkPenalty(message, member, offense);
+        return;
+      }
+    } else {
+      // Modo whitelist: considera liberações por cargo ("*" = todos) + whitelist global + restrição por canal.
+      const roleMap = await automodRepository.getLinkRoles(message.guildId);
+      let allowAll = false;
+      const roleDomains: string[] = [];
+      if (member && roleMap.size > 0) {
+        for (const roleId of member.roles.cache.keys()) {
+          const domains = roleMap.get(roleId);
+          if (!domains) continue;
+          if (domains.includes('*')) {
+            allowAll = true;
+            break;
+          }
+          roleDomains.push(...domains);
+        }
+      }
+
+      if (!allowAll) {
+        const check = checkLinks(message.content, {
+          roleDomains,
+          globalDomains: await automodRepository.getLinkWhitelist(message.guildId),
+          domainChannels: await automodRepository.getDomainChannelMap(message.guildId),
+          channelId: message.channelId,
+          parentId: message.channel.parentId ?? null
+        });
+
+        // Link permitido, mas no canal errado → apaga e informa onde pode enviar (sem punir).
+        if (check.type === 'wrongChannel') {
+          const onde = check.channelIds.map((id) => `<#${id}>`).join(', ');
+          await deleteWithNotice(message, `links de \`${check.domain}\` só podem ser enviados em: ${onde}.`);
+          return;
+        }
+
+        // Link fora de qualquer lista → apaga + escala (4ª warn, 5ª+ mute 1h).
+        if (check.type === 'blocked') {
+          const offense = registerLinkOffense(message);
+          const base = 'esse link não está na lista de links permitidos do servidor. Para ver quais são permitidos, use **/links permitidos**.';
+          await deleteWithNotice(message, `${base}${linkOffenseSuffix(offense)}`);
+          if (offense >= LINK_WARN_AT) await applyLinkPenalty(message, member, offense);
+          return;
+        }
+      }
+    }
+  }
+
+  // 4) Encaminhamento (forward) de fora (outro servidor/DM) → apaga. Forwards internos são liberados.
   if (config.antiForward && isForeignForward(message) && !(await isChannelAllowed(message, 'forward'))) {
     await deleteWithNotice(message, 'mensagens encaminhadas de outros servidores/DMs não são permitidas aqui.');
     return;
   }
 
-  // 3) Menções em massa → apaga + warn + mute de 1 min.
+  // 5) Menções em massa → apaga + warn + mute de 1 min.
   if (
     config.antiMassMention &&
     countMentions(message.content) > config.maxMentions &&
@@ -257,7 +479,7 @@ export async function runAutomod(message: Message): Promise<void> {
     return;
   }
 
-  // 4) Mensagens gigantes → apaga; após mais de 3 violações, warn + mute de 2 min.
+  // 6) Mensagens gigantes → apaga; após mais de 3 violações, warn + mute de 2 min.
   if (config.antiBigMessage && message.content.length > config.maxMessageLength && !(await isChannelAllowed(message, 'bigmessage'))) {
     await deleteWithNotice(message, `mensagens muito longas (acima de ${config.maxMessageLength} caracteres) não são permitidas aqui.`);
     const violations = registerBigMessage(message);
@@ -275,6 +497,6 @@ export async function runAutomod(message: Message): Promise<void> {
     return;
   }
 
-  // 5) Spam / flood (pulado em canais/categorias liberados).
+  // 7) Spam / flood (pulado em canais/categorias liberados).
   if (config.antiSpam && !(await isChannelAllowed(message, 'spam'))) await checkSpam(message, member);
 }

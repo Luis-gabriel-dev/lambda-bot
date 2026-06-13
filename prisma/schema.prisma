@@ -139,8 +139,59 @@ model AutomodConfig {
   antiInvite       Boolean @default(false)
   antiMassMention  Boolean @default(false)
   antiForward      Boolean @default(false)
+  antiLink         Boolean @default(false)
+  antiGif          Boolean @default(false)
+  linkMode         String  @default("whitelist") // "whitelist" (bloqueia tudo, libera lista) ou "blacklist" (libera tudo, bloqueia lista)
   maxMessageLength Int     @default(600)
   maxMentions      Int     @default(5)
+}
+
+/// Domínios liberados (whitelist) do módulo anti-link, por servidor.
+model AutomodLinkWhitelist {
+  id      Int    @id @default(autoincrement())
+  guildId String
+  domain  String
+
+  @@unique([guildId, domain])
+}
+
+/// Domínios bloqueados (blacklist) do módulo anti-link, por servidor (modo blacklist).
+model AutomodLinkBlacklist {
+  id      Int    @id @default(autoincrement())
+  guildId String
+  domain  String
+
+  @@unique([guildId, domain])
+}
+
+/// Cargos autorizados a enviar GIFs quando o módulo anti-GIF está ligado.
+model AutomodGifRole {
+  id      Int    @id @default(autoincrement())
+  guildId String
+  roleId  String
+
+  @@unique([guildId, roleId])
+}
+
+/// Liberação de links por cargo (anti-link). domain = "*" significa todos os links.
+model AutomodLinkRole {
+  id      Int    @id @default(autoincrement())
+  guildId String
+  roleId  String
+  domain  String
+
+  @@unique([guildId, roleId, domain])
+}
+
+/// Restringe um domínio da whitelist a canais/categorias específicos.
+/// Se um domínio tem linhas aqui, só é permitido nesses canais; sem linhas = em todos.
+model AutomodLinkChannel {
+  id        Int    @id @default(autoincrement())
+  guildId   String
+  domain    String
+  channelId String
+
+  @@unique([guildId, domain, channelId])
 }
 
 /// Canais/categorias liberados de um módulo do automod (bigmessage/invite).
