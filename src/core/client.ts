@@ -18,6 +18,7 @@ export function createClient(): Client {
       GatewayIntentBits.GuildMembers, // entrada/saída de membros (privilegiado)
       GatewayIntentBits.GuildModeration, // guildBanAdd / guildBanRemove
       GatewayIntentBits.GuildVoiceStates, // entrar/sair/mudar de call (log de calls)
+      GatewayIntentBits.GuildExpressions, // criação/exclusão de emojis e figurinhas (log do servidor)
       GatewayIntentBits.MessageContent // ler conteúdo de mensagens apagadas/editadas (privilegiado)
     ],
     partials: [

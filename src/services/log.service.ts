@@ -1,4 +1,4 @@
-import { AttachmentBuilder, EmbedBuilder, Guild, GuildTextBasedChannel } from 'discord.js';
+import { AttachmentBuilder, ChannelType, EmbedBuilder, Guild, GuildTextBasedChannel } from 'discord.js';
 import { logChannelRepository } from '../repositories/logChannel.repository';
 
 /** Tipos de log suportados → rótulo legível (usado nas choices do /logs e nas listagens). */
@@ -12,13 +12,32 @@ export const LOG_TYPES = {
   tickets: 'Tickets',
   audit: 'Auditoria de mensagens',
   moderacao: 'Moderação (warns, unmute, unban)',
-  cargos: 'Cargos (criação, exclusão, atribuição)'
+  cargos: 'Cargos (criação, exclusão, atribuição)',
+  servidor: 'Servidor (emojis, figurinhas, canais, tópicos)'
 } as const;
 
 export type LogType = keyof typeof LOG_TYPES;
 
 export function isLogType(value: string): value is LogType {
   return value in LOG_TYPES;
+}
+
+const CHANNEL_TYPE_LABELS: Partial<Record<ChannelType, string>> = {
+  [ChannelType.GuildText]: 'Texto',
+  [ChannelType.GuildVoice]: 'Voz',
+  [ChannelType.GuildCategory]: 'Categoria',
+  [ChannelType.GuildAnnouncement]: 'Anúncios',
+  [ChannelType.GuildStageVoice]: 'Palco',
+  [ChannelType.GuildForum]: 'Fórum',
+  [ChannelType.GuildMedia]: 'Mídia',
+  [ChannelType.AnnouncementThread]: 'Tópico (anúncio)',
+  [ChannelType.PublicThread]: 'Tópico público',
+  [ChannelType.PrivateThread]: 'Tópico privado'
+};
+
+/** Nome amigável (PT-BR) de um tipo de canal. */
+export function channelTypeLabel(type: ChannelType): string {
+  return CHANNEL_TYPE_LABELS[type] ?? `Tipo ${type}`;
 }
 
 /** Resolve o canal configurado para um tipo de log (ou null se não houver / inacessível). */

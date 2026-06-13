@@ -28,5 +28,23 @@ export const guildConfigRepository = {
     const data = type === 'bot' ? { botRoleId: null } : { autoRoleId: null };
     await prisma.guildConfig.update({ where: { guildId }, data });
     return true;
+  },
+
+  /** Define (ou limpa, com null) o canal público de boas-vindas. */
+  async setWelcomeChannel(guildId: string, channelId: string | null): Promise<void> {
+    await prisma.guildConfig.upsert({
+      where: { guildId },
+      create: { guildId, welcomeChannelId: channelId },
+      update: { welcomeChannelId: channelId }
+    });
+  },
+
+  /** Define (ou limpa, com null) a imagem/gif fixo do embed de boas-vindas. */
+  async setWelcomeImage(guildId: string, url: string | null): Promise<void> {
+    await prisma.guildConfig.upsert({
+      where: { guildId },
+      create: { guildId, welcomeImageUrl: url },
+      update: { welcomeImageUrl: url }
+    });
   }
 };

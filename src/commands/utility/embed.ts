@@ -158,6 +158,7 @@ const component: Component = {
 
 const command: Command = {
   data: new SlashCommandBuilder().setName('embed').setDescription('Abre o editor de embed completo.'),
+  restricted: true,
   components: [component],
   async execute(interaction: ChatInputCommandInteraction) {
     const embed = new EmbedBuilder()

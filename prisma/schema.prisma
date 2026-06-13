@@ -42,6 +42,8 @@ model GuildConfig {
   autoRoleId       String? // cargo dado a membros humanos ao entrar
   botRoleId        String? // cargo dado a bots ao entrar
   ticketCategoryId String? // categoria onde os canais de ticket são criados
+  welcomeChannelId String? // canal público de boas-vindas
+  welcomeImageUrl  String? // imagem/gif fixo do embed de boas-vindas
 }
 
 /// Ticket aberto (1 canal = 1 ticket).
@@ -186,6 +188,52 @@ model InstaLike {
   post   InstaPost @relation(fields: [postId], references: [id], onDelete: Cascade)
 
   @@unique([postId, userId])
+}
+
+/// Configuração da economia (kurocoins) por servidor.
+model EconomyConfig {
+  guildId             String    @id
+  dropChannelId       String?
+  dropIntervalMinutes Int?
+  dropMin             Int       @default(10)
+  dropMax             Int       @default(500)
+  expireDeleteMs      Int? // apagar a mensagem de "ninguém coletou" após N ms (null = nunca)
+  claimedDeleteMs     Int? // apagar a mensagem de "coletado por X" após N ms (null = nunca)
+  lastDropAt          DateTime?
+}
+
+/// GIFs usados nos drops de dinheiro.
+model EconomyGif {
+  id      Int    @id @default(autoincrement())
+  guildId String
+  url     String
+}
+
+/// Carteira de um membro (kurocoins).
+model Wallet {
+  id             Int      @id @default(autoincrement())
+  guildId        String
+  userId         String
+  balance        Int      @default(0)
+  totalCollected Int      @default(0)
+  collectCount   Int      @default(0)
+  createdAt      DateTime @default(now())
+
+  @@unique([guildId, userId])
+}
+
+/// Drop de dinheiro (1 mensagem = 1 drop). Primeiro a coletar leva.
+model Drop {
+  id          Int      @id @default(autoincrement())
+  guildId     String
+  channelId   String
+  messageId   String   @unique
+  amount      Int
+  claimedById String?
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  @@index([guildId, active])
 }
 
 /// Atividade de mensagens agregada por hora (para requisitos de sorteio).

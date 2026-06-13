@@ -13,6 +13,8 @@ const INVITE_RE =
 const FLOOD_COUNT = 5;
 const FLOOD_WINDOW_MS = 5_000;
 const REPEAT_COUNT = 3;
+const FIGURE_REPEAT_COUNT = 5; // mesma figurinha/anexo > 4 vezes...
+const FIGURE_REPEAT_WINDOW_MS = 15_000; // ...em um tempo curto
 const SHORT_MUTE_MS = 60_000; // 1 min
 const LONG_MUTE_MS = 24 * 60 * 60 * 1000; // 1 dia
 const ESCALATION_AT = 3; // 3ª ocorrência → mute longo
@@ -46,10 +48,20 @@ function isForeignForward(message: Message<true>): boolean {
 interface SpamState {
   timestamps: number[];
   recentContents: string[];
+  mediaSignatures: { sig: string; time: number }[];
   offenseCount: number;
   lastOffense: number;
 }
 const spamMap = new Map<string, SpamState>();
+
+/** "Assinatura" de figurinhas/anexos da mensagem (null se for só texto). */
+function mediaSignature(message: Message<true>): string | null {
+  if (message.stickers.size > 0) return `sticker:${[...message.stickers.keys()].sort().join(',')}`;
+  if (message.attachments.size > 0) {
+    return `file:${[...message.attachments.values()].map((a) => `${a.name}:${a.size}`).sort().join(',')}`;
+  }
+  return null;
+}
 const bigMessageMap = new Map<string, { count: number; last: number }>();
 
 function isExempt(member: GuildMember, exemptRoleIds: string[]): boolean {
@@ -150,7 +162,8 @@ async function punishSpam(message: Message<true>, member: GuildMember | null, of
 async function checkSpam(message: Message<true>, member: GuildMember | null): Promise<void> {
   const key = `${message.guildId}:${message.author.id}`;
   const now = Date.now();
-  const state = spamMap.get(key) ?? { timestamps: [], recentContents: [], offenseCount: 0, lastOffense: 0 };
+  const state = spamMap.get(key) ?? { timestamps: [], recentContents: [], mediaSignatures: [], offenseCount: 0, lastOffense: 0 };
+  state.mediaSignatures ??= [];
 
   state.timestamps = state.timestamps.filter((t) => now - t < FLOOD_WINDOW_MS);
   state.timestamps.push(now);
@@ -164,13 +177,23 @@ async function checkSpam(message: Message<true>, member: GuildMember | null): Pr
     repetition = state.recentContents.length === REPEAT_COUNT && state.recentContents.every((c) => c === content);
   }
 
-  if (!flood && !repetition) {
+  // Mesma figurinha/anexo repetido em tempo curto (> 4 vezes).
+  const sig = mediaSignature(message);
+  let figureRepeat = false;
+  if (sig) {
+    state.mediaSignatures = state.mediaSignatures.filter((m) => now - m.time < FIGURE_REPEAT_WINDOW_MS);
+    state.mediaSignatures.push({ sig, time: now });
+    figureRepeat = state.mediaSignatures.filter((m) => m.sig === sig).length >= FIGURE_REPEAT_COUNT;
+  }
+
+  if (!flood && !repetition && !figureRepeat) {
     spamMap.set(key, state);
     return;
   }
 
   state.timestamps = [];
   state.recentContents = [];
+  state.mediaSignatures = [];
   if (now - state.lastOffense > OFFENSE_RESET_MS) state.offenseCount = 0;
   state.offenseCount += 1;
   state.lastOffense = now;

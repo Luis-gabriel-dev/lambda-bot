@@ -36,17 +36,22 @@ export async function resolveAccess(
     return { allowed: false, reason: 'Este comando só pode ser usado em um servidor.' };
   }
 
+  const denied = 'Você não tem permissão para usar este comando.';
+  const isAdmin = interaction.memberPermissions?.has(PermissionFlagsBits.Administrator) ?? false;
+
   const roleIds = await commandPermissionRepository.getRoleIds(interaction.guildId, command.data.name);
   if (roleIds.length === 0) {
+    // Para o usuário comum é só falta de permissão; para o admin, mostramos a dica de como liberar.
     return {
       allowed: false,
-      reason:
-        'Este comando ainda não foi configurado neste servidor. Um administrador precisa definir um cargo com `/permissao add`.'
+      reason: isAdmin
+        ? 'Este comando ainda não foi liberado para nenhum cargo. Use `/permissao add` para autorizar um cargo.'
+        : denied
     };
   }
 
   if (!interaction.member.roles.cache.hasAny(...roleIds)) {
-    return { allowed: false, reason: 'Você não tem um cargo autorizado a usar este comando.' };
+    return { allowed: false, reason: denied };
   }
 
   return { allowed: true };

@@ -3,6 +3,7 @@ import { Event } from '../interfaces/Event';
 import { Palette } from '../utils/embeds';
 import { discordTimestamp } from '../utils/formatter';
 import { sendLog } from '../services/log.service';
+import { sendWelcome } from '../services/welcome.service';
 import { guildConfigRepository } from '../repositories/guildConfig.repository';
 
 /** Atribui o cargo automático (membro ou bot) configurado para o servidor. */
@@ -23,6 +24,9 @@ const event: Event<'guildMemberAdd'> = {
   name: 'guildMemberAdd',
   async execute(_client: Client, member) {
     await applyAutoRole(member);
+
+    // Boas-vindas no canal público (separado do log de entrada abaixo).
+    await sendWelcome(member);
 
     const embed = new EmbedBuilder()
       .setColor(Palette.success)
