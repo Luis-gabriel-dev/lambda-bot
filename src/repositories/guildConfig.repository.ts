@@ -46,5 +46,32 @@ export const guildConfigRepository = {
       create: { guildId, welcomeImageUrl: url },
       update: { welcomeImageUrl: url }
     });
+  },
+
+  /** Define (ou limpa) o canal de regras citado nas boas-vindas. */
+  async setWelcomeRulesChannel(guildId: string, channelId: string | null): Promise<void> {
+    await prisma.guildConfig.upsert({
+      where: { guildId },
+      create: { guildId, welcomeRulesChannelId: channelId },
+      update: { welcomeRulesChannelId: channelId }
+    });
+  },
+
+  /** Define (ou limpa) o canal de cor de perfil citado nas boas-vindas. */
+  async setWelcomeColorChannel(guildId: string, channelId: string | null): Promise<void> {
+    await prisma.guildConfig.upsert({
+      where: { guildId },
+      create: { guildId, welcomeColorChannelId: channelId },
+      update: { welcomeColorChannelId: channelId }
+    });
+  },
+
+  /** Define (ou limpa, com null = cor aleatória) a cor fixa do embed de boas-vindas. */
+  async setWelcomeColor(guildId: string, color: number | null): Promise<void> {
+    await prisma.guildConfig.upsert({
+      where: { guildId },
+      create: { guildId, welcomeColor: color },
+      update: { welcomeColor: color }
+    });
   }
 };

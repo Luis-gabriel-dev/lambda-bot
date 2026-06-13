@@ -7,10 +7,10 @@ import {
   SlashCommandBuilder
 } from 'discord.js';
 import { Command } from '../../interfaces/Command';
-import { applyUrl, errorEmbed, infoEmbed, successEmbed } from '../../utils/embeds';
+import { applyColor, applyUrl, errorEmbed, infoEmbed, successEmbed } from '../../utils/embeds';
 import { isAdminOrOwner } from '../../services/permission.service';
 import { guildConfigRepository } from '../../repositories/guildConfig.repository';
-import { buildWelcome } from '../../services/welcome.service';
+import { buildWelcome, resolveWelcomeColor } from '../../services/welcome.service';
 
 const command: Command = {
   data: new SlashCommandBuilder()
@@ -30,6 +30,24 @@ const command: Command = {
         .setName('imagem')
         .setDescription('Define (ou remove) a imagem/gif fixa do embed.')
         .addStringOption((opt) => opt.setName('url').setDescription('URL da imagem/gif. Deixe vazio para remover.').setRequired(false))
+    )
+    .addSubcommand((sub) =>
+      sub
+        .setName('regras')
+        .setDescription('Canal de regras citado nas boas-vindas (vazio remove a linha).')
+        .addChannelOption((opt) => opt.setName('canal').setDescription('Canal de regras.').addChannelTypes(ChannelType.GuildText).setRequired(false))
+    )
+    .addSubcommand((sub) =>
+      sub
+        .setName('cor-canal')
+        .setDescription('Canal de cor de perfil citado nas boas-vindas (vazio remove a linha).')
+        .addChannelOption((opt) => opt.setName('canal').setDescription('Canal de cor de perfil.').addChannelTypes(ChannelType.GuildText).setRequired(false))
+    )
+    .addSubcommand((sub) =>
+      sub
+        .setName('cor-embed')
+        .setDescription('Cor fixa do embed (vazio = cor do avatar do membro, senão aleatória).')
+        .addStringOption((opt) => opt.setName('cor').setDescription('Cor #RRGGBB ou nome (ex.: Blurple). Vazio = automática.').setRequired(false))
     )
     .addSubcommand((sub) => sub.setName('testar').setDescription('Mostra uma prévia das boas-vindas com o seu perfil.'))
     .addSubcommand((sub) => sub.setName('desativar').setDescription('Desativa as boas-vindas.'))
@@ -75,6 +93,49 @@ const command: Command = {
       return;
     }
 
+    if (sub === 'regras') {
+      const canal = interaction.options.getChannel('canal');
+      await guildConfigRepository.setWelcomeRulesChannel(guildId, canal?.id ?? null);
+      await interaction.reply({
+        embeds: [successEmbed(canal ? `Linha de regras vai citar <#${canal.id}>.` : 'Linha de regras removida das boas-vindas.')],
+        flags: MessageFlags.Ephemeral
+      });
+      return;
+    }
+
+    if (sub === 'cor-canal') {
+      const canal = interaction.options.getChannel('canal');
+      await guildConfigRepository.setWelcomeColorChannel(guildId, canal?.id ?? null);
+      await interaction.reply({
+        embeds: [successEmbed(canal ? `Linha de cor de perfil vai citar <#${canal.id}>.` : 'Linha de cor de perfil removida das boas-vindas.')],
+        flags: MessageFlags.Ephemeral
+      });
+      return;
+    }
+
+    if (sub === 'cor-embed') {
+      const corInput = interaction.options.getString('cor');
+      if (!corInput) {
+        await guildConfigRepository.setWelcomeColor(guildId, null);
+        await interaction.reply({
+          embeds: [successEmbed('Cor do embed agora é **automática**: pega a cor predominante do avatar do membro (ou uma aleatória se não tiver foto).')],
+          flags: MessageFlags.Ephemeral
+        });
+        return;
+      }
+      const tmp = new EmbedBuilder();
+      if (!applyColor(tmp, corInput) || typeof tmp.data.color !== 'number') {
+        await interaction.reply({ embeds: [errorEmbed('Cor inválida. Use `#RRGGBB` ou um nome como `Blurple`.')], flags: MessageFlags.Ephemeral });
+        return;
+      }
+      await guildConfigRepository.setWelcomeColor(guildId, tmp.data.color);
+      await interaction.reply({
+        embeds: [successEmbed(`Cor fixa do embed definida para \`#${tmp.data.color.toString(16).padStart(6, '0')}\`.`)],
+        flags: MessageFlags.Ephemeral
+      });
+      return;
+    }
+
     if (sub === 'desativar') {
       await guildConfigRepository.setWelcomeChannel(guildId, null);
       await interaction.reply({ embeds: [successEmbed('Boas-vindas desativadas.')], flags: MessageFlags.Ephemeral });
@@ -85,9 +146,19 @@ const command: Command = {
       const config = await guildConfigRepository.get(guildId);
       const canal = config?.welcomeChannelId ? `<#${config.welcomeChannelId}>` : '*não definido*';
       const imagem = config?.welcomeImageUrl ? `[ver imagem](${config.welcomeImageUrl})` : '*nenhuma*';
+      const regras = config?.welcomeRulesChannelId ? `<#${config.welcomeRulesChannelId}>` : '*nenhum*';
+      const corCanal = config?.welcomeColorChannelId ? `<#${config.welcomeColorChannelId}>` : '*nenhum*';
+      const cor =
+        typeof config?.welcomeColor === 'number'
+          ? `\`#${config.welcomeColor.toString(16).padStart(6, '0')}\``
+          : '*automática (avatar → aleatória)*';
       const ativo = config?.welcomeChannelId ? '🟢 ativo' : '🔴 inativo (defina um canal)';
       await interaction.reply({
-        embeds: [infoEmbed(`**Boas-vindas**\nStatus: ${ativo}\nCanal: ${canal}\nImagem: ${imagem}`)],
+        embeds: [
+          infoEmbed(
+            `**Boas-vindas**\nStatus: ${ativo}\nCanal: ${canal}\nImagem: ${imagem}\nCanal de regras: ${regras}\nCanal de cor de perfil: ${corCanal}\nCor do embed: ${cor}`
+          )
+        ],
         flags: MessageFlags.Ephemeral
       });
       return;
@@ -95,7 +166,13 @@ const command: Command = {
 
     // testar — prévia com o próprio perfil (efêmera; na entrada real o membro é mencionado no conteúdo).
     const config = await guildConfigRepository.get(guildId);
-    const { embed } = buildWelcome(interaction.member, config?.welcomeImageUrl);
+    const color = await resolveWelcomeColor(interaction.member, config?.welcomeColor);
+    const { embed } = buildWelcome(interaction.member, {
+      imageUrl: config?.welcomeImageUrl,
+      rulesChannelId: config?.welcomeRulesChannelId,
+      colorChannelId: config?.welcomeColorChannelId,
+      color
+    });
     await interaction.reply({
       content: '🔎 Prévia das boas-vindas (na entrada real, o novo membro é marcado no início da mensagem):',
       embeds: [embed],

@@ -42,8 +42,11 @@ model GuildConfig {
   autoRoleId       String? // cargo dado a membros humanos ao entrar
   botRoleId        String? // cargo dado a bots ao entrar
   ticketCategoryId String? // categoria onde os canais de ticket são criados
-  welcomeChannelId String? // canal público de boas-vindas
-  welcomeImageUrl  String? // imagem/gif fixo do embed de boas-vindas
+  welcomeChannelId      String? // canal público de boas-vindas
+  welcomeImageUrl       String? // imagem/gif fixo do embed de boas-vindas
+  welcomeRulesChannelId String? // canal de regras citado nas boas-vindas
+  welcomeColorChannelId String? // canal de cor de perfil citado nas boas-vindas
+  welcomeColor          Int? // cor fixa do embed (null = aleatória entre 40 cores)
 }
 
 /// Ticket aberto (1 canal = 1 ticket).
