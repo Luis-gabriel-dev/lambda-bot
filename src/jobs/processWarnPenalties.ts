@@ -1,7 +1,7 @@
 import { Client, EmbedBuilder } from 'discord.js';
 import { warnPenaltyRepository } from '../repositories/warnPenalty.repository';
 import { warningRepository } from '../repositories/warning.repository';
-import { buildStaffEmbed } from '../services/moderation.service';
+import { buildStaffEmbed, sendGuildDM } from '../services/moderation.service';
 import { sendLog } from '../services/log.service';
 import { Palette } from '../utils/embeds';
 import { logger } from '../core/logger';
@@ -24,7 +24,7 @@ async function runPenalties(client: Client): Promise<void> {
           'você será **banido** do servidor.\n\nEvite quebrar as regras do servidor caso queira se manter nele.',
         color: Palette.info
       });
-      await user.send({ embeds: [dm] }).catch(() => undefined);
+      await sendGuildDM(user, guild.id, dm);
     }
     await warnPenaltyRepository.markMuteNotified(penalty.id);
   }
@@ -41,7 +41,7 @@ async function runPenalties(client: Client): Promise<void> {
         description: 'Suas advertências no servidor foram **zeradas**. Continue seguindo as regras!',
         color: Palette.success
       });
-      await user.send({ embeds: [dm] }).catch(() => undefined);
+      await sendGuildDM(user, guild.id, dm);
 
       const log = new EmbedBuilder()
         .setColor(Palette.success)

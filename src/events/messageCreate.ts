@@ -3,11 +3,16 @@ import { Event } from '../interfaces/Event';
 import { messageActivityRepository } from '../repositories/messageActivity.repository';
 import { runAutomod } from '../services/automod.service';
 import { handleInstagramMessage } from '../services/instagram.service';
+import { handleTrap } from '../services/trap.service';
 
 const event: Event<'messageCreate'> = {
   name: 'messageCreate',
   async execute(_client: Client, message) {
     if (!message.guild) return;
+
+    // Canal-armadilha: se a mensagem caiu na trap, já foi tratada (kick) — não processa o resto.
+    const trapped = await handleTrap(message).catch(() => false);
+    if (trapped) return;
 
     // Mural de fotos: se a mensagem virou post (ou foi apagada no canal), não processa o resto.
     const consumed = await handleInstagramMessage(message).catch(() => false);

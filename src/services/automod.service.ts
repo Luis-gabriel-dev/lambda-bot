@@ -1,9 +1,10 @@
-import { APIEmbedField, EmbedBuilder, GuildMember, Message, MessageReferenceType, PermissionFlagsBits } from 'discord.js';
+import { APIEmbedField, AttachmentBuilder, EmbedBuilder, GuildMember, Message, MessageReferenceType, PermissionFlagsBits } from 'discord.js';
 import { automodRepository, AutomodAllowFeature } from '../repositories/automod.repository';
 import { warningRepository } from '../repositories/warning.repository';
-import { buildPunishmentDM, escalateWarnings } from './moderation.service';
+import { buildPunishmentDM, escalateWarnings, sendGuildDM } from './moderation.service';
 import { sendLog } from './log.service';
 import { Palette } from '../utils/embeds';
+import { truncate } from '../utils/formatter';
 
 // Links de convite de servidores (discord.gg, discord.com/invite, etc.).
 const INVITE_RE =
@@ -36,6 +37,10 @@ const LINK_WARN_AT = 4; // 4ª ocorrência → advertência
 const LINK_MUTE_AT = 5; // 5ª+ → mute de 1h
 const LINK_MUTE_MS = 60 * 60 * 1000; // 1 hora
 const LINK_OFFENSE_RESET_MS = 10 * 60 * 1000; // ocorrências zeram após 10 min
+
+// Anti-raid (conta hackeada / bot disfarçado disparando em vários canais).
+const RAID_CHANNEL_COUNT = 4; // nº de canais distintos...
+const RAID_WINDOW_MS = 10_000; // ...atingidos em até 10s → não é humano
 
 function countMentions(content: string): number {
   const ids = content.match(/<@[!&]?\d+>/g)?.length ?? 0;
@@ -153,6 +158,7 @@ interface SpamState {
 }
 const spamMap = new Map<string, SpamState>();
 const linkOffenseMap = new Map<string, { count: number; last: number }>();
+const raidMap = new Map<string, { message: Message<true>; time: number }[]>();
 
 /** Conta ocorrências de link não permitido por usuário (com janela de reset). */
 function registerLinkOffense(message: Message<true>): number {
@@ -225,7 +231,7 @@ async function applyMuteWarn(
       reason: opts.warnReason,
       until
     });
-    await member.send({ embeds: [dm] }).catch(() => undefined);
+    await sendGuildDM(member, message.guildId, dm);
   }
 
   const log = new EmbedBuilder()
@@ -258,7 +264,7 @@ async function applyLinkPenalty(message: Message<true>, member: GuildMember | nu
       reason,
       until
     });
-    await member.send({ embeds: [dm] }).catch(() => undefined);
+    await sendGuildDM(member, message.guildId, dm);
     fields.push({ name: 'Punição', value: 'mute de 1h', inline: true });
   } else {
     fields.push({ name: 'Punição', value: 'advertência', inline: true });
@@ -352,6 +358,85 @@ async function checkSpam(message: Message<true>, member: GuildMember | null): Pr
   await punishSpam(message, member, state.offenseCount);
 }
 
+/** Loga as mensagens apagadas no anti-raid (conteúdo + anexos reenviados) em #log-de-mensagens. */
+async function logRaidMessages(guild: Message<true>['guild'], author: Message<true>['author'], entries: { message: Message<true> }[]): Promise<void> {
+  const files: AttachmentBuilder[] = [];
+  const lines: string[] = [];
+  for (const { message } of entries) {
+    const content = message.content?.trim();
+    const atts = [...message.attachments.values()];
+    lines.push(`**<#${message.channelId}>**: ${content ? truncate(content, 200) : '*(sem texto)*'}${atts.length > 0 ? ` — ${atts.length} anexo(s)` : ''}`);
+    for (const att of atts) {
+      if (files.length >= 10) break;
+      files.push(new AttachmentBuilder(att.url, { name: att.name ?? 'anexo' }));
+    }
+  }
+
+  const embed = new EmbedBuilder()
+    .setColor(Palette.error)
+    .setTitle('🗑️ Mensagens apagadas (anti-raid)')
+    .setThumbnail(author.displayAvatarURL({ size: 256 }))
+    .setDescription(`Autor: ${author} \`${author.tag}\`\n\n${truncate(lines.join('\n'), 4000)}`)
+    .setTimestamp();
+  await sendLog(guild, 'mensagens', embed, files.length > 0 ? files : undefined);
+}
+
+/** Disparo em vários canais → kick imediato, apaga tudo e loga (mensagens + punição). */
+async function punishRaid(message: Message<true>, member: GuildMember | null, entries: { message: Message<true>; time: number }[]): Promise<void> {
+  const guild = message.guild;
+  const channels = new Set(entries.map((e) => e.message.channelId));
+  const reason = `Disparo em ${channels.size} canais em segundos (anti-raid — provável conta comprometida/bot)`;
+
+  // 1) Avisa por DM antes do kick.
+  if (member) {
+    const dm = buildPunishmentDM({
+      guildName: guild.name,
+      guildIcon: guild.iconURL({ size: 256 }),
+      action: 'expulso',
+      color: Palette.error,
+      reason,
+      note: 'Isso parece atividade de conta comprometida. Se foi você, troque sua senha e ative a verificação em duas etapas antes de voltar.'
+    });
+    await sendGuildDM(member, message.guildId, dm);
+  }
+
+  // 2) Loga as mensagens apagadas (antes de apagar, enquanto os anexos existem).
+  await logRaidMessages(guild, message.author, entries).catch(() => undefined);
+
+  // 3) Apaga as mensagens (agrupadas por canal).
+  const byChannel = new Map<string, string[]>();
+  for (const { message: msg } of entries) {
+    const list = byChannel.get(msg.channelId) ?? [];
+    list.push(msg.id);
+    byChannel.set(msg.channelId, list);
+  }
+  for (const [channelId, ids] of byChannel) {
+    const channel = await guild.channels.fetch(channelId).catch(() => null);
+    if (channel?.isTextBased() && 'bulkDelete' in channel) await channel.bulkDelete(ids, true).catch(() => undefined);
+  }
+
+  // 4) Kick.
+  let kicked = false;
+  if (member?.kickable) {
+    await member.kick(reason).catch(() => undefined);
+    kicked = true;
+  }
+
+  // 5) Loga a punição.
+  const log = new EmbedBuilder()
+    .setColor(Palette.error)
+    .setTitle('🚨 Anti-raid: disparo em vários canais')
+    .setThumbnail(message.author.displayAvatarURL({ size: 256 }))
+    .addFields(
+      { name: 'Usuário', value: `${message.author} \`${message.author.tag}\``, inline: true },
+      { name: 'Ação', value: kicked ? 'expulso (kick)' : '⚠️ não consegui expulsar', inline: true },
+      { name: 'Canais atingidos', value: `${channels.size}`, inline: true },
+      { name: 'Mensagens apagadas', value: `${entries.length}`, inline: true }
+    )
+    .setTimestamp();
+  await sendLog(guild, 'punicoes', log);
+}
+
 /** Executa todos os módulos de automod em uma mensagem. */
 export async function runAutomod(message: Message): Promise<void> {
   if (!message.inGuild()) return;
@@ -366,7 +451,8 @@ export async function runAutomod(message: Message): Promise<void> {
       !config.antiMassMention &&
       !config.antiForward &&
       !config.antiLink &&
-      !config.antiGif)
+      !config.antiGif &&
+      !config.antiRaid)
   ) {
     return;
   }
@@ -374,6 +460,20 @@ export async function runAutomod(message: Message): Promise<void> {
   const member = message.member ?? (await message.guild.members.fetch(message.author.id).catch(() => null));
   const exemptRoleIds = await automodRepository.getExemptRoleIds(message.guildId);
   if (member && isExempt(member, exemptRoleIds)) return;
+
+  // 0) Anti-raid: mesma pessoa disparando em vários canais em segundos → kick + purge + log.
+  if (config.antiRaid) {
+    const key = `${message.guildId}:${message.author.id}`;
+    const now = Date.now();
+    const entries = (raidMap.get(key) ?? []).filter((e) => now - e.time < RAID_WINDOW_MS);
+    entries.push({ message, time: now });
+    raidMap.set(key, entries);
+    if (new Set(entries.map((e) => e.message.channelId)).size >= RAID_CHANNEL_COUNT) {
+      raidMap.delete(key);
+      await punishRaid(message, member, entries);
+      return;
+    }
+  }
 
   // 1) Convites de outros servidores → apaga + warn + mute de 1 min.
   if (config.antiInvite && INVITE_RE.test(message.content) && !(await isChannelAllowed(message, 'invite'))) {

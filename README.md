@@ -22,7 +22,12 @@ All **admin** commands require the *Administrator* permission; **moderation** co
 - **`/ban`**, **`/unban`**, **`/kick`**, **`/mute`**, **`/unmute`**, **`/clear`**.
 - **`/warn`** applies a warning; **`/grace`** forgives all warnings and resets the penalty cycle.
 
-**Automod** (`/automod`) — 5 toggleable modules: anti-spam (flood + repeated text/stickers/attachments), anti-big-message, anti-invite, anti-mass-mention and anti-forward, with exempt roles and per-channel allowlists.
+**Automod** (`/automod`) — toggleable modules with exempt roles and per-channel allowlists: anti-spam (flood + repeated text/stickers/attachments), anti-big-message, anti-invite, anti-mass-mention, anti-forward, anti-link, anti-GIF and anti-raid.
+- **Anti-link** has two modes (`/links modo`): **whitelist** (block every link, allow only listed ones) or **blacklist** (allow every link, block only listed ones). Manage with `/links permitidos` / `/links bloqueados` (interactive panels), restrict an allowed domain to specific channels with `/links canal`, and grant roles all/specific links with `/links cargo`. Blocking escalates: delete → 3rd warns → 4th warn → 5th+ 1h mute.
+- **Anti-GIF** (`/gifs`) — only allowed roles (e.g. Booster) can send GIFs; everyone else's GIFs are deleted.
+- **Anti-raid** — if one account posts across **4+ channels within seconds** (compromised account / disguised bot), it's **kicked**, all its messages are **purged**, and both the deleted messages and the punishment are logged.
+
+**Trap** (`/trap`) — a honeypot channel: anyone who posts there is **kicked instantly** (the owner, the bot and exempt roles are spared). Catches spam bots and doubles as a server prank.
 
 **Tickets** (`/ticket`) — button panels that open private channels, with transcripts on close.
 
@@ -156,7 +161,12 @@ Todos os comandos de **admin** exigem a permissão *Administrador*; os de **mode
 - **`/ban`**, **`/unban`**, **`/kick`**, **`/mute`**, **`/unmute`**, **`/clear`**.
 - **`/warn`** aplica uma advertência; **`/grace`** perdoa todas e zera o ciclo de punição.
 
-**Automod** (`/automod`) — 5 módulos ligáveis: anti-spam (flood + repetição de texto/figurinhas/anexos), anti-mensagem-gigante, anti-convite, anti-menção-em-massa e anti-encaminhamento, com cargos isentos e canais liberados.
+**Automod** (`/automod`) — módulos ligáveis, com cargos isentos e canais liberados: anti-spam (flood + repetição de texto/figurinhas/anexos), anti-mensagem-gigante, anti-convite, anti-menção-em-massa, anti-encaminhamento, anti-link, anti-GIF e anti-raid.
+- **Anti-link** tem dois modos (`/links modo`): **whitelist** (bloqueia todo link, libera só os listados) ou **blacklist** (libera todo link, bloqueia só os listados). Gerencie com `/links permitidos` / `/links bloqueados` (painéis interativos), restrinja um domínio liberado a canais com `/links canal`, e libere por cargo (todos ou específicos) com `/links cargo`. O bloqueio escala: apaga → 3ª avisa → 4ª warn → 5ª+ mute de 1h.
+- **Anti-GIF** (`/gifs`) — só cargos liberados (ex.: Booster) podem enviar GIFs; os demais têm o GIF apagado.
+- **Anti-raid** — se uma conta posta em **4+ canais em segundos** (conta comprometida / bot disfarçado), ela é **expulsa**, todas as mensagens são **apagadas**, e tanto as mensagens apagadas quanto a punição vão para os logs.
+
+**Trap** (`/trap`) — canal-armadilha: quem postar nele leva **kick na hora** (o dono, o bot e cargos isentos são poupados). Pega bots de spam e serve de brincadeira no servidor.
 
 **Tickets** (`/ticket`) — painéis de botão que abrem canais privados, com transcrição ao fechar.
 

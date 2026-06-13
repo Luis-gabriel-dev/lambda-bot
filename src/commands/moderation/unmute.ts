@@ -7,7 +7,7 @@ import {
 } from 'discord.js';
 import { Command } from '../../interfaces/Command';
 import { errorEmbed, Palette, successEmbed } from '../../utils/embeds';
-import { buildPunishmentDM, WARN_RESET_GRACE_MS } from '../../services/moderation.service';
+import { buildPunishmentDM, sendGuildDM, WARN_RESET_GRACE_MS } from '../../services/moderation.service';
 import { sendLog } from '../../services/log.service';
 import { warnPenaltyRepository } from '../../repositories/warnPenalty.repository';
 
@@ -69,7 +69,7 @@ const command: Command = {
       color: Palette.success,
       reason
     });
-    await member.send({ embeds: [dm] }).catch(() => undefined);
+    await sendGuildDM(member, interaction.guildId, dm);
 
     const extra = restartedCycle
       ? '\nEra o silenciamento automático: o prazo de 7 dias para zerar as advertências começou agora.'

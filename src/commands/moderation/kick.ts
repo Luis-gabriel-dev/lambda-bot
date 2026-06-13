@@ -7,7 +7,7 @@ import {
 } from 'discord.js';
 import { Command } from '../../interfaces/Command';
 import { errorEmbed, Palette, successEmbed } from '../../utils/embeds';
-import { buildPunishmentDM, checkHierarchy } from '../../services/moderation.service';
+import { buildPunishmentDM, checkHierarchy, sendGuildDM } from '../../services/moderation.service';
 import { sendLog } from '../../services/log.service';
 
 const command: Command = {
@@ -69,7 +69,7 @@ const command: Command = {
       color: Palette.warning,
       reason
     });
-    await member.send({ embeds: [dm] }).catch(() => undefined);
+    await sendGuildDM(member, interaction.guildId, dm);
 
     await member.kick(`${interaction.user.tag}: ${reason}`);
 

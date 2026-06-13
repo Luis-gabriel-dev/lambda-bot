@@ -6,7 +6,7 @@ import {
 } from 'discord.js';
 import { Command } from '../../interfaces/Command';
 import { errorEmbed, Palette, successEmbed } from '../../utils/embeds';
-import { buildPunishmentDM, checkHierarchy } from '../../services/moderation.service';
+import { buildPunishmentDM, checkHierarchy, sendGuildDM } from '../../services/moderation.service';
 import { isOwner } from '../../services/permission.service';
 import { archiveMessages, collectUserMessages, isAuditEnabled } from '../../services/audit.service';
 
@@ -88,7 +88,7 @@ const command: Command = {
       color: Palette.error,
       reason
     });
-    await user.send({ embeds: [dm] }).catch(() => undefined);
+    await sendGuildDM(user, interaction.guildId, dm);
 
     await interaction.guild.bans.create(user.id, {
       reason: `${interaction.user.tag}: ${reason}`,

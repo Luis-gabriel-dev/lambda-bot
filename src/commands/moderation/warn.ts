@@ -5,6 +5,7 @@ import {
   buildWarnDM,
   checkHierarchy,
   escalateWarnings,
+  sendGuildDM,
   WARN_BAN_THRESHOLD,
   WARN_MUTE_THRESHOLD
 } from '../../services/moderation.service';
@@ -99,7 +100,7 @@ const command: Command = {
         reason,
         total
       });
-      await user.send({ embeds: [warnDm] }).catch(() => undefined);
+      await sendGuildDM(user, guildId, warnDm);
 
       const toMute = Math.max(0, WARN_MUTE_THRESHOLD - total);
       const toBan = Math.max(0, WARN_BAN_THRESHOLD - total);

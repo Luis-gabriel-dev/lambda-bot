@@ -1,10 +1,18 @@
 import { AutomodConfig } from '@prisma/client';
 import { prisma } from '../core/database';
 
-export type AutomodToggle = 'spam' | 'bigmessage' | 'invite' | 'massmention' | 'forward' | 'link' | 'gif';
+export type AutomodToggle = 'spam' | 'bigmessage' | 'invite' | 'massmention' | 'forward' | 'link' | 'gif' | 'raid';
 export type AutomodAllowFeature = 'bigmessage' | 'invite' | 'spam' | 'massmention' | 'forward' | 'link' | 'gif';
 
-type ToggleColumn = 'antiSpam' | 'antiBigMessage' | 'antiInvite' | 'antiMassMention' | 'antiForward' | 'antiLink' | 'antiGif';
+type ToggleColumn =
+  | 'antiSpam'
+  | 'antiBigMessage'
+  | 'antiInvite'
+  | 'antiMassMention'
+  | 'antiForward'
+  | 'antiLink'
+  | 'antiGif'
+  | 'antiRaid';
 
 function toggleColumn(feature: AutomodToggle): ToggleColumn {
   switch (feature) {
@@ -22,6 +30,8 @@ function toggleColumn(feature: AutomodToggle): ToggleColumn {
       return 'antiLink';
     case 'gif':
       return 'antiGif';
+    case 'raid':
+      return 'antiRaid';
   }
 }
 

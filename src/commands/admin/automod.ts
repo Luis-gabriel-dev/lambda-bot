@@ -17,7 +17,8 @@ const MODULE_LABEL: Record<AutomodToggle, string> = {
   massmention: 'Anti-menção em massa',
   forward: 'Anti-encaminhamento',
   link: 'Anti-links',
-  gif: 'Anti-GIFs'
+  gif: 'Anti-GIFs',
+  raid: 'Anti-raid (multi-canal)'
 };
 
 const command: Command = {
@@ -41,7 +42,8 @@ const command: Command = {
               { name: 'Menção em massa', value: 'massmention' },
               { name: 'Encaminhamento (forward)', value: 'forward' },
               { name: 'Links', value: 'link' },
-              { name: 'GIFs', value: 'gif' }
+              { name: 'GIFs', value: 'gif' },
+              { name: 'Raid (disparo em vários canais)', value: 'raid' }
             )
         )
         .addBooleanOption((opt) => opt.setName('ativo').setDescription('Ligar (true) ou desligar (false).').setRequired(true))
@@ -245,6 +247,7 @@ const command: Command = {
       `**Anti-encaminhamento:** ${on(config?.antiForward)}`,
       `**Anti-links:** ${on(config?.antiLink)} — modo **${linkMode}** (${linkMode === 'blacklist' ? `${blacklist.length} bloqueado(s)` : `${whitelist.length} liberado(s)`})`,
       `**Anti-GIFs:** ${on(config?.antiGif)} — cargos liberados: ${list(gifRoles, '<@&')}`,
+      `**Anti-raid (multi-canal):** ${on(config?.antiRaid)} — kick + apaga tudo se postar em ${4} canais em segundos`,
       `**Cargos isentos:** ${list(exemptRoles, '<@&')}`,
       `**Liberado (gigantes):** ${list(bigChannels, '<#')}`,
       `**Liberado (convites):** ${list(inviteChannels, '<#')}`,

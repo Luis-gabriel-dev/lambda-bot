@@ -47,6 +47,17 @@ model GuildConfig {
   welcomeRulesChannelId String? // canal de regras citado nas boas-vindas
   welcomeColorChannelId String? // canal de cor de perfil citado nas boas-vindas
   welcomeColor          Int? // cor fixa do embed (null = aleatória entre 40 cores)
+  trapChannelId         String? // canal-armadilha: quem mandar mensagem aqui leva kick
+  dmImageUrl            String? // imagem padrão usada em todos os embeds de DM do bot
+}
+
+/// Cargos que NÃO levam kick no canal-armadilha (/trap).
+model TrapExemptRole {
+  id      Int    @id @default(autoincrement())
+  guildId String
+  roleId  String
+
+  @@unique([guildId, roleId])
 }
 
 /// Ticket aberto (1 canal = 1 ticket).
@@ -141,6 +152,7 @@ model AutomodConfig {
   antiForward      Boolean @default(false)
   antiLink         Boolean @default(false)
   antiGif          Boolean @default(false)
+  antiRaid         Boolean @default(false) // disparo em vários canais ao mesmo tempo (conta hackeada / bot)
   linkMode         String  @default("whitelist") // "whitelist" (bloqueia tudo, libera lista) ou "blacklist" (libera tudo, bloqueia lista)
   maxMessageLength Int     @default(600)
   maxMentions      Int     @default(5)

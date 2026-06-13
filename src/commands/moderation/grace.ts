@@ -1,7 +1,7 @@
 import { ChatInputCommandInteraction, EmbedBuilder, MessageFlags, SlashCommandBuilder } from 'discord.js';
 import { Command } from '../../interfaces/Command';
 import { errorEmbed, Palette, successEmbed } from '../../utils/embeds';
-import { buildStaffEmbed } from '../../services/moderation.service';
+import { buildStaffEmbed, sendGuildDM } from '../../services/moderation.service';
 import { sendLog } from '../../services/log.service';
 import { warningRepository } from '../../repositories/warning.repository';
 import { warnPenaltyRepository } from '../../repositories/warnPenalty.repository';
@@ -55,7 +55,7 @@ const command: Command = {
         'Continue seguindo as regras do servidor.',
       color: Palette.success
     });
-    await member?.send({ embeds: [dm] }).catch(() => undefined);
+    if (member) await sendGuildDM(member, interaction.guildId, dm);
 
     // Log na moderação.
     const log = new EmbedBuilder()

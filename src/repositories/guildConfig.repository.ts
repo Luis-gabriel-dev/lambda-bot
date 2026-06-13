@@ -73,5 +73,43 @@ export const guildConfigRepository = {
       create: { guildId, welcomeColor: color },
       update: { welcomeColor: color }
     });
+  },
+
+  /** Define (ou limpa) o canal-armadilha (/trap). */
+  async setTrapChannel(guildId: string, channelId: string | null): Promise<void> {
+    await prisma.guildConfig.upsert({
+      where: { guildId },
+      create: { guildId, trapChannelId: channelId },
+      update: { trapChannelId: channelId }
+    });
+  },
+
+  /** Define (ou limpa) a imagem padrão dos embeds de DM do bot. */
+  async setDmImage(guildId: string, url: string | null): Promise<void> {
+    await prisma.guildConfig.upsert({
+      where: { guildId },
+      create: { guildId, dmImageUrl: url },
+      update: { dmImageUrl: url }
+    });
+  },
+
+  // ---- Cargos isentos do trap ----
+  async getTrapExemptRoleIds(guildId: string): Promise<string[]> {
+    const rows = await prisma.trapExemptRole.findMany({ where: { guildId }, select: { roleId: true } });
+    return rows.map((r) => r.roleId);
+  },
+
+  async addTrapExemptRole(guildId: string, roleId: string): Promise<boolean> {
+    try {
+      await prisma.trapExemptRole.create({ data: { guildId, roleId } });
+      return true;
+    } catch {
+      return false;
+    }
+  },
+
+  async removeTrapExemptRole(guildId: string, roleId: string): Promise<boolean> {
+    const result = await prisma.trapExemptRole.deleteMany({ where: { guildId, roleId } });
+    return result.count > 0;
   }
 };

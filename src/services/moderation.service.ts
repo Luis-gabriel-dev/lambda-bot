@@ -3,6 +3,17 @@ import { Palette } from '../utils/embeds';
 import { discordTimestamp } from '../utils/formatter';
 import { sendLog } from './log.service';
 import { warnPenaltyRepository } from '../repositories/warnPenalty.repository';
+import { guildConfigRepository } from '../repositories/guildConfig.repository';
+
+/**
+ * Envia um embed na DM de um usuário/membro, aplicando a imagem padrão de DM do
+ * servidor (se configurada via /dm). Silencioso se a DM estiver fechada.
+ */
+export async function sendGuildDM(target: User | GuildMember, guildId: string, embed: EmbedBuilder): Promise<void> {
+  const config = await guildConfigRepository.get(guildId).catch(() => null);
+  if (config?.dmImageUrl) embed.setImage(config.dmImageUrl);
+  await target.send({ embeds: [embed] }).catch(() => undefined);
+}
 
 /**
  * Valida se `executor` pode moderar `target` pela hierarquia de cargos
@@ -30,7 +41,7 @@ export const WARN_BAN_THRESHOLD = 8;
 export const WARN_MUTE_MS = 24 * 60 * 60 * 1000; // 1 dia de silenciamento
 export const WARN_RESET_GRACE_MS = 7 * 24 * 60 * 60 * 1000; // 1 semana após o mute para zerar
 
-const STAFF_FOOTER = 'Staff do Servidor';
+const DM_FOOTER = 'Feito com amor e carinho por Kuro ❤️';
 
 export interface PunishmentDmOptions {
   guildName: string;
@@ -51,12 +62,13 @@ export function buildPunishmentDM(o: PunishmentDmOptions): EmbedBuilder {
   const when = o.appliedAt ?? new Date();
   const embed = new EmbedBuilder()
     .setColor(o.color)
-    .setTitle(`Você foi ${o.action} em ${o.guildName}`)
+    .setAuthor({ name: o.guildName, iconURL: o.guildIcon ?? undefined }) // ícone do servidor em círculo + nome
+    .setTitle(`Você foi ${o.action}`)
     .addFields({ name: 'Motivo', value: o.reason }, { name: 'Quando', value: discordTimestamp(when, 'F') })
-    .setFooter({ text: STAFF_FOOTER, iconURL: o.guildIcon ?? undefined })
+    .setFooter({ text: DM_FOOTER })
     .setTimestamp(when);
 
-  if (o.guildIcon) embed.setThumbnail(o.guildIcon);
+  if (o.guildIcon) embed.setThumbnail(o.guildIcon); // ícone do servidor em quadrado
   if (o.until) {
     embed.addFields({ name: 'Expira', value: `${discordTimestamp(o.until, 'F')} (${discordTimestamp(o.until, 'R')})` });
   }
@@ -73,11 +85,12 @@ export function buildStaffEmbed(
 ): EmbedBuilder {
   const embed = new EmbedBuilder()
     .setColor(opts.color)
+    .setAuthor({ name: guildName, iconURL: guildIcon ?? undefined }) // ícone do servidor em círculo + nome
     .setTitle(opts.title)
     .setDescription(opts.description)
-    .setFooter({ text: STAFF_FOOTER, iconURL: guildIcon ?? undefined })
+    .setFooter({ text: DM_FOOTER })
     .setTimestamp();
-  if (guildIcon) embed.setThumbnail(guildIcon);
+  if (guildIcon) embed.setThumbnail(guildIcon); // ícone do servidor em quadrado
   return embed;
 }
 
@@ -98,16 +111,17 @@ export function buildWarnDM(opts: { guildName: string; guildIcon: string | null;
 
   const embed = new EmbedBuilder()
     .setColor(Palette.warning)
-    .setTitle(`Você recebeu uma advertência em ${opts.guildName}`)
+    .setAuthor({ name: opts.guildName, iconURL: opts.guildIcon ?? undefined }) // ícone do servidor em círculo + nome
+    .setTitle('Você recebeu uma advertência')
     .addFields(
       { name: 'Motivo', value: opts.reason },
       { name: 'Total de advertências', value: `**${total}**`, inline: true },
       { name: 'Situação', value: status },
       { name: '​', value: 'Evite quebrar as regras do servidor caso queira se manter nele.' }
     )
-    .setFooter({ text: STAFF_FOOTER, iconURL: opts.guildIcon ?? undefined })
+    .setFooter({ text: DM_FOOTER })
     .setTimestamp();
-  if (opts.guildIcon) embed.setThumbnail(opts.guildIcon);
+  if (opts.guildIcon) embed.setThumbnail(opts.guildIcon); // ícone do servidor em quadrado
   return embed;
 }
 
@@ -130,7 +144,7 @@ export async function escalateWarnings(guild: Guild, user: User, total: number):
       color: Palette.error,
       reason
     });
-    await user.send({ embeds: [dm] }).catch(() => undefined);
+    await sendGuildDM(user, guild.id, dm);
     await guild.bans.create(user.id, { reason }); // guildBanAdd loga no #log-de-bans
     await warnPenaltyRepository.removeForUser(guild.id, user.id);
     return `atingiu ${total} advertências e foi **banido**`;
@@ -153,7 +167,7 @@ export async function escalateWarnings(guild: Guild, user: User, total: number):
         `Mas atenção: se receber **${WARN_MUTE_THRESHOLD}** advertências novamente, será **banido** do servidor.\n\n` +
         `Evite quebrar as regras do servidor caso queira se manter nele.`
     });
-    await user.send({ embeds: [dm] }).catch(() => undefined);
+    await sendGuildDM(user, guild.id, dm);
     await member.timeout(WARN_MUTE_MS, reason);
     await warnPenaltyRepository.schedule(guild.id, user.id, muteEndsAt, resetAt);
 

@@ -7,7 +7,7 @@ import {
 } from 'discord.js';
 import { Command } from '../../interfaces/Command';
 import { errorEmbed, Palette, successEmbed } from '../../utils/embeds';
-import { buildPunishmentDM, checkHierarchy } from '../../services/moderation.service';
+import { buildPunishmentDM, checkHierarchy, sendGuildDM } from '../../services/moderation.service';
 import { isOwner } from '../../services/permission.service';
 import { sendLog } from '../../services/log.service';
 import { formatDuration, parseDuration } from '../../utils/time';
@@ -102,7 +102,7 @@ const command: Command = {
       reason,
       until
     });
-    await member.send({ embeds: [dm] }).catch(() => undefined);
+    await sendGuildDM(member, interaction.guildId, dm);
 
     await interaction.reply({
       embeds: [successEmbed(`🔇 **${user.tag}** foi silenciado por ${human}.\nMotivo: ${reason}`)],
