@@ -1,7 +1,7 @@
 import { APIEmbedField, AttachmentBuilder, EmbedBuilder, GuildMember, Message, MessageReferenceType, PermissionFlagsBits } from 'discord.js';
 import { automodRepository, AutomodAllowFeature } from '../repositories/automod.repository';
 import { warningRepository } from '../repositories/warning.repository';
-import { buildPunishmentDM, escalateWarnings, sendGuildDM } from './moderation.service';
+import { buildPunishmentDM, buildStaffEmbed, escalateWarnings, sendGuildDM } from './moderation.service';
 import { sendLog } from './log.service';
 import { Palette } from '../utils/embeds';
 import { truncate } from '../utils/formatter';
@@ -201,7 +201,7 @@ async function deleteWithNotice(message: Message<true>, text: string): Promise<v
   await message.delete().catch(() => undefined);
   if (message.channel.isSendable()) {
     const notice = await message.channel.send(`${message.author}, ${text}`).catch(() => null);
-    if (notice) setTimeout(() => void notice.delete().catch(() => undefined), 6_000);
+    if (notice) setTimeout(() => void notice.delete().catch(() => undefined), 12_000);
   }
 }
 
@@ -277,6 +277,27 @@ async function applyLinkPenalty(message: Message<true>, member: GuildMember | nu
     .addFields({ name: 'Usuário', value: `${message.author} \`${message.author.tag}\``, inline: true }, ...fields)
     .setTimestamp();
   await sendLog(message.guild, 'punicoes', log);
+}
+
+/**
+ * Apaga o link e avisa. A 3ª ocorrência vai SÓ na DM (privado); as demais ficam no
+ * chat público (auto-apagam). Da 4ª em diante aplica advertência/mute.
+ */
+async function handleBlockedLink(message: Message<true>, member: GuildMember | null, offense: number, baseText: string): Promise<void> {
+  if (offense === LINK_WARN_AT - 1) {
+    await message.delete().catch(() => undefined);
+    const cap = baseText.charAt(0).toUpperCase() + baseText.slice(1);
+    const dm = buildStaffEmbed(message.guild.name, message.guild.iconURL({ size: 256 }), {
+      title: '🔗 Aviso sobre links',
+      description: `${cap}\n\n⚠️ Se enviar **mais um** link não permitido, você receberá uma **advertência** — e, continuando, pode ser **silenciado**.`,
+      color: Palette.warning
+    });
+    await sendGuildDM(message.author, message.guildId, dm);
+    return;
+  }
+
+  await deleteWithNotice(message, `${baseText}${linkOffenseSuffix(offense)}`);
+  if (offense >= LINK_WARN_AT) await applyLinkPenalty(message, member, offense);
 }
 
 /** Conta violações de mensagem gigante por usuário (com janela de reset). */
@@ -507,9 +528,7 @@ export async function runAutomod(message: Message): Promise<void> {
     if (config.linkMode === 'blacklist') {
       const blacklist = await automodRepository.getLinkBlacklist(message.guildId);
       if (hasBlacklistedLink(message.content, blacklist)) {
-        const offense = registerLinkOffense(message);
-        await deleteWithNotice(message, `esse link está na lista de **bloqueados** deste servidor.${linkOffenseSuffix(offense)}`);
-        if (offense >= LINK_WARN_AT) await applyLinkPenalty(message, member, offense);
+        await handleBlockedLink(message, member, registerLinkOffense(message), 'esse link está na lista de **bloqueados** deste servidor.');
         return;
       }
     } else {
@@ -538,19 +557,16 @@ export async function runAutomod(message: Message): Promise<void> {
           parentId: message.channel.parentId ?? null
         });
 
-        // Link permitido, mas no canal errado → apaga e informa onde pode enviar (sem punir).
+        // Link permitido, mas no canal errado → apaga e informa no chat onde pode enviar (sem punir).
         if (check.type === 'wrongChannel') {
           const onde = check.channelIds.map((id) => `<#${id}>`).join(', ');
           await deleteWithNotice(message, `links de \`${check.domain}\` só podem ser enviados em: ${onde}.`);
           return;
         }
 
-        // Link fora de qualquer lista → apaga + escala (4ª warn, 5ª+ mute 1h).
+        // Link fora de qualquer lista → apaga + avisa; 3ª na DM, demais no chat; 4ª = warn, 5ª+ = mute.
         if (check.type === 'blocked') {
-          const offense = registerLinkOffense(message);
-          const base = 'esse link não está na lista de links permitidos do servidor. Para ver quais são permitidos, use **/links permitidos**.';
-          await deleteWithNotice(message, `${base}${linkOffenseSuffix(offense)}`);
-          if (offense >= LINK_WARN_AT) await applyLinkPenalty(message, member, offense);
+          await handleBlockedLink(message, member, registerLinkOffense(message), 'esse link não está na lista de **permitidos** do servidor. Veja com **/links permitidos**.');
           return;
         }
       }

@@ -2,13 +2,14 @@ import {
   ChannelType,
   ChatInputCommandInteraction,
   EmbedBuilder,
+  Guild,
   MessageFlags,
   PermissionFlagsBits,
   SlashCommandBuilder
 } from 'discord.js';
 import { Command } from '../../interfaces/Command';
 import { Component, ComponentInteraction } from '../../interfaces/Component';
-import { applyUrl, errorEmbed, infoEmbed, successEmbed } from '../../utils/embeds';
+import { applyColor, applyUrl, errorEmbed, infoEmbed, successEmbed } from '../../utils/embeds';
 import { isAdminOrOwner } from '../../services/permission.service';
 import { instagramRepository } from '../../repositories/instagram.repository';
 import {
@@ -19,19 +20,26 @@ import {
   handleDelete,
   handleInfo,
   handleLike,
-  handleLikers
+  handleLikers,
+  handleTitle,
+  handleTitleModal
 } from '../../services/instagram.service';
 
 const component: Component = {
   id: 'insta',
   execute(interaction: ComponentInteraction) {
-    if (!interaction.isButton()) return;
     const cid = interaction.customId;
+    if (interaction.isModalSubmit()) {
+      if (cid.startsWith('insta:titlemodal:')) return handleTitleModal(interaction);
+      return;
+    }
+    if (!interaction.isButton()) return;
     if (cid === 'insta:like') return handleLike(interaction);
     if (cid === 'insta:comment') return handleComment(interaction);
     if (cid === 'insta:likers') return handleLikers(interaction);
     if (cid === 'insta:info') return handleInfo(interaction);
     if (cid === 'insta:delete') return handleDelete(interaction);
+    if (cid.startsWith('insta:title:')) return handleTitle(interaction);
     if (cid.startsWith('insta:confirm:')) return handleConfirm(interaction);
     if (cid.startsWith('insta:cancel:')) return handleCancel(interaction);
   }
@@ -63,6 +71,14 @@ const command: Command = {
         .setName('disclaimer')
         .setDescription('Reenvia o aviso de funcionamento em um canal.')
         .addChannelOption((opt) => opt.setName('canal').setDescription('Canal do mural.').setRequired(true))
+    )
+    .addSubcommand((sub) =>
+      sub
+        .setName('info')
+        .setDescription('Define a imagem e/ou a cor do embed de informação (ℹ️) de um canal.')
+        .addChannelOption((opt) => opt.setName('canal').setDescription('Canal do mural.').setRequired(true))
+        .addStringOption((opt) => opt.setName('imagem').setDescription('URL da imagem (ou "remover" para tirar).').setRequired(false))
+        .addStringOption((opt) => opt.setName('cor').setDescription('Cor #RRGGBB ou nome (ex.: Blurple).').setRequired(false))
     ),
 
   components: [component],
@@ -100,9 +116,7 @@ const command: Command = {
         else imagemInvalida = true;
       }
 
-      const imageUrl = await instagramRepository.getDisclaimerImageUrl(canal.id);
-      const channel = await interaction.guild.channels.fetch(canal.id).catch(() => null);
-      if (channel?.isSendable()) await channel.send({ embeds: [buildDisclaimerEmbed(imageUrl)] });
+      await sendDisclaimerMessage(interaction.guild, canal.id);
 
       const aviso = imagemInvalida ? '\n⚠️ Imagem inválida — ignorada.' : '';
       await interaction.reply({
@@ -122,17 +136,64 @@ const command: Command = {
       return;
     }
 
-    // disclaimer
     const canal = interaction.options.getChannel('canal', true);
     if (!(await instagramRepository.isInstaChannel(guildId, canal.id))) {
       await interaction.reply({ embeds: [errorEmbed('Esse canal não tem mural de fotos ativo.')], flags: MessageFlags.Ephemeral });
       return;
     }
-    const imageUrl = await instagramRepository.getDisclaimerImageUrl(canal.id);
-    const channel = await interaction.guild.channels.fetch(canal.id).catch(() => null);
-    if (channel?.isSendable()) await channel.send({ embeds: [buildDisclaimerEmbed(imageUrl)] });
+
+    if (sub === 'info') {
+      const imagemInput = interaction.options.getString('imagem');
+      const corInput = interaction.options.getString('cor');
+      if (!imagemInput && !corInput) {
+        await interaction.reply({ embeds: [errorEmbed('Informe a `imagem` e/ou a `cor` para mudar.')], flags: MessageFlags.Ephemeral });
+        return;
+      }
+
+      const avisos: string[] = [];
+      if (imagemInput) {
+        if (imagemInput.trim().toLowerCase() === 'remover') {
+          await instagramRepository.setDisclaimerImage(canal.id, null);
+          avisos.push('imagem removida');
+        } else {
+          const tmp = new EmbedBuilder();
+          if (applyUrl((u) => tmp.setImage(u), imagemInput)) {
+            await instagramRepository.setDisclaimerImage(canal.id, imagemInput.trim());
+            avisos.push('imagem atualizada');
+          } else avisos.push('⚠️ imagem inválida (ignorada)');
+        }
+      }
+      if (corInput) {
+        const tmp = new EmbedBuilder();
+        if (applyColor(tmp, corInput) && typeof tmp.data.color === 'number') {
+          await instagramRepository.setDisclaimerColor(canal.id, tmp.data.color);
+          avisos.push('cor atualizada');
+        } else avisos.push('⚠️ cor inválida (ignorada)');
+      }
+
+      await sendDisclaimerMessage(interaction.guild, canal.id);
+      await interaction.reply({
+        embeds: [successEmbed(`Embed de informação de <#${canal.id}>: ${avisos.join(', ')}. Aviso reenviado.`)],
+        flags: MessageFlags.Ephemeral
+      });
+      return;
+    }
+
+    // disclaimer
+    await sendDisclaimerMessage(interaction.guild, canal.id);
     await interaction.reply({ embeds: [successEmbed('Aviso reenviado.')], flags: MessageFlags.Ephemeral });
   }
 };
+
+/** Reenvia o embed de informação no canal, com a imagem, a cor e o ícone do servidor configurados. */
+async function sendDisclaimerMessage(guild: Guild, channelId: string): Promise<void> {
+  const cfg = await instagramRepository.getDisclaimerConfig(channelId);
+  const channel = await guild.channels.fetch(channelId).catch(() => null);
+  if (channel?.isSendable()) {
+    await channel.send({
+      embeds: [buildDisclaimerEmbed({ imageUrl: cfg.imageUrl, color: cfg.color, guildIcon: guild.iconURL({ size: 128 }) })]
+    });
+  }
+}
 
 export default command;

@@ -231,6 +231,7 @@ model InstagramChannel {
   guildId            String
   channelId          String  @unique
   disclaimerImageUrl String? // imagem fixa do aviso desse canal
+  disclaimerColor    Int? // cor do embed de informação (null = padrão)
 }
 
 /// Post do mini Instagram (1 mensagem do bot = 1 post).
@@ -241,6 +242,9 @@ model InstaPost {
   messageId    String      @unique
   threadId     String?     @unique
   authorId     String
+  title        String? // título opcional do post (definido pela pessoa)
+  caption      String? // legenda (texto enviado junto da mídia)
+  color        Int? // cor do card (cor predominante da foto; null = padrão)
   commentCount Int         @default(0)
   createdAt    DateTime    @default(now())
   likes        InstaLike[]

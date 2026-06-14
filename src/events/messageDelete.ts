@@ -13,7 +13,7 @@ import { Palette } from '../utils/embeds';
 import { truncate } from '../utils/formatter';
 import { sendLog } from '../services/log.service';
 import { instagramRepository } from '../repositories/instagram.repository';
-import { handleThreadCommentsRemoved } from '../services/instagram.service';
+import { handlePostMessageDeleted, handleThreadCommentsRemoved } from '../services/instagram.service';
 
 const IMAGE_RE = /\.(png|jpe?g|gif|webp)$/i;
 
@@ -47,8 +47,12 @@ const event: Event<'messageDelete'> = {
       await handleThreadCommentsRemoved(client, message.channelId, 1);
     }
 
-    // Não loga deleções nos canais do mural de fotos (o bot reposta as fotos lá).
-    if (await instagramRepository.isInstaChannel(guild.id, message.channelId)) return;
+    // Canal do mural: se a mensagem apagada for um post (do bot), salva a foto e limpa;
+    // qualquer outra deleção no canal do mural é ignorada (o bot reposta as fotos lá).
+    if (await instagramRepository.isInstaChannel(guild.id, message.channelId)) {
+      await handlePostMessageDeleted(client, message);
+      return;
+    }
 
     // ---- Mensagem fora do cache: sem conteúdo, mas dá pra logar se foi um mod ----
     if (message.partial) {

@@ -13,7 +13,8 @@ export const LOG_TYPES = {
   audit: 'Auditoria de mensagens',
   moderacao: 'Moderação (warns, unmute, unban)',
   cargos: 'Cargos (criação, exclusão, atribuição)',
-  servidor: 'Servidor (emojis, figurinhas, canais, tópicos)'
+  servidor: 'Servidor (emojis, figurinhas, canais, tópicos)',
+  instagram: 'Instagram (mural de fotos/vídeos)'
 } as const;
 
 export type LogType = keyof typeof LOG_TYPES;

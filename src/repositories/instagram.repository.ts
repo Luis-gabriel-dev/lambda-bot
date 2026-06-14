@@ -40,15 +40,28 @@ export const instagramRepository = {
     return channel?.disclaimerImageUrl ?? null;
   },
 
+  async setDisclaimerColor(channelId: string, color: number | null): Promise<void> {
+    await prisma.instagramChannel.update({ where: { channelId }, data: { disclaimerColor: color } }).catch(() => undefined);
+  },
+
+  /** Imagem + cor do aviso do canal (para montar o embed de informação). */
+  async getDisclaimerConfig(channelId: string): Promise<{ imageUrl: string | null; color: number | null }> {
+    const channel = await prisma.instagramChannel.findUnique({ where: { channelId } });
+    return { imageUrl: channel?.disclaimerImageUrl ?? null, color: channel?.disclaimerColor ?? null };
+  },
+
   // ---- Posts ----
   async createPost(
     guildId: string,
     channelId: string,
     messageId: string,
     threadId: string | null,
-    authorId: string
+    authorId: string,
+    title: string | null,
+    caption: string | null,
+    color: number | null
   ): Promise<InstaPost> {
-    return prisma.instaPost.create({ data: { guildId, channelId, messageId, threadId, authorId } });
+    return prisma.instaPost.create({ data: { guildId, channelId, messageId, threadId, authorId, title, caption, color } });
   },
 
   async getPostByMessage(messageId: string): Promise<InstaPost | null> {
