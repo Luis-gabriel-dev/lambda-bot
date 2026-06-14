@@ -50,6 +50,45 @@ model GuildConfig {
   trapChannelId         String? // canal-armadilha: quem mandar mensagem aqui leva kick
   dmImageUrl            String? // imagem padrão usada em todos os embeds de DM do bot
   bumpChannelId         String? // canal exclusivo de /bump (apaga o que não for /bump)
+  partnerAnnounceChannelId String? // canal onde o anúncio de parceria (texto + convite) é postado
+  partnerNotifyRoleId      String? // cargo @parceria marcado no anúncio
+  partnerPublicChannelId   String? // canal do embed público "fez parceria"
+  partnerImageUrl          String? // imagem customizável do embed público de parceria
+  partnerCategoryId        String? // categoria onde os canais de ticket de parceria são criados
+}
+
+/// Cargos autorizados a ver/confirmar tickets de parceria.
+model PartnerSupportRole {
+  id      Int    @id @default(autoincrement())
+  guildId String
+  roleId  String
+
+  @@unique([guildId, roleId])
+}
+
+/// Contador de parcerias fechadas por administrador (métrica por servidor).
+model PartnerStat {
+  id      Int    @id @default(autoincrement())
+  guildId String
+  userId  String
+  count   Int    @default(0)
+
+  @@unique([guildId, userId])
+}
+
+/// Ticket de parceria aberto (1 canal = 1 pedido de parceria).
+model Partnership {
+  id           Int      @id @default(autoincrement())
+  guildId      String
+  channelId    String   @unique
+  openerId     String
+  inviteUrl    String? // último convite detectado
+  inviteServer String? // nome do servidor do convite (via fetchInvite)
+  pitchText    String? // texto/mensagem que acompanha o convite
+  status       String   @default("aberto") // aberto | aprovado | recusado
+  createdAt    DateTime @default(now())
+
+  @@index([guildId, openerId])
 }
 
 /// Cargos que NÃO levam kick no canal-armadilha (/trap).

@@ -14,7 +14,8 @@ export const LOG_TYPES = {
   moderacao: 'Moderação (warns, unmute, unban)',
   cargos: 'Cargos (criação, exclusão, atribuição)',
   servidor: 'Servidor (emojis, figurinhas, canais, tópicos)',
-  instagram: 'Instagram (mural de fotos/vídeos)'
+  instagram: 'Instagram (mural de fotos/vídeos)',
+  parcerias: 'Parcerias (transcripts)'
 } as const;
 
 export type LogType = keyof typeof LOG_TYPES;
