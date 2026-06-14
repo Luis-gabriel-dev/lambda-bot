@@ -49,10 +49,20 @@ model GuildConfig {
   welcomeColor          Int? // cor fixa do embed (null = aleatória entre 40 cores)
   trapChannelId         String? // canal-armadilha: quem mandar mensagem aqui leva kick
   dmImageUrl            String? // imagem padrão usada em todos os embeds de DM do bot
+  bumpChannelId         String? // canal exclusivo de /bump (apaga o que não for /bump)
 }
 
 /// Cargos que NÃO levam kick no canal-armadilha (/trap).
 model TrapExemptRole {
+  id      Int    @id @default(autoincrement())
+  guildId String
+  roleId  String
+
+  @@unique([guildId, roleId])
+}
+
+/// Cargos que podem mandar qualquer coisa no canal de bump (além de bots).
+model BumpExemptRole {
   id      Int    @id @default(autoincrement())
   guildId String
   roleId  String

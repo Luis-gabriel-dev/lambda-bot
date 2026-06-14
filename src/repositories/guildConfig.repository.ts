@@ -111,5 +111,34 @@ export const guildConfigRepository = {
   async removeTrapExemptRole(guildId: string, roleId: string): Promise<boolean> {
     const result = await prisma.trapExemptRole.deleteMany({ where: { guildId, roleId } });
     return result.count > 0;
+  },
+
+  /** Define (ou limpa) o canal exclusivo de /bump. */
+  async setBumpChannel(guildId: string, channelId: string | null): Promise<void> {
+    await prisma.guildConfig.upsert({
+      where: { guildId },
+      create: { guildId, bumpChannelId: channelId },
+      update: { bumpChannelId: channelId }
+    });
+  },
+
+  // ---- Cargos liberados no canal de bump ----
+  async getBumpExemptRoleIds(guildId: string): Promise<string[]> {
+    const rows = await prisma.bumpExemptRole.findMany({ where: { guildId }, select: { roleId: true } });
+    return rows.map((r) => r.roleId);
+  },
+
+  async addBumpExemptRole(guildId: string, roleId: string): Promise<boolean> {
+    try {
+      await prisma.bumpExemptRole.create({ data: { guildId, roleId } });
+      return true;
+    } catch {
+      return false;
+    }
+  },
+
+  async removeBumpExemptRole(guildId: string, roleId: string): Promise<boolean> {
+    const result = await prisma.bumpExemptRole.deleteMany({ where: { guildId, roleId } });
+    return result.count > 0;
   }
 };

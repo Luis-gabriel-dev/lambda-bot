@@ -4,6 +4,7 @@ import { messageActivityRepository } from '../repositories/messageActivity.repos
 import { runAutomod } from '../services/automod.service';
 import { handleInstagramMessage } from '../services/instagram.service';
 import { handleTrap } from '../services/trap.service';
+import { handleBumpChannel } from '../services/bump.service';
 
 const event: Event<'messageCreate'> = {
   name: 'messageCreate',
@@ -13,6 +14,10 @@ const event: Event<'messageCreate'> = {
     // Canal-armadilha: se a mensagem caiu na trap, já foi tratada (kick) — não processa o resto.
     const trapped = await handleTrap(message).catch(() => false);
     if (trapped) return;
+
+    // Canal exclusivo de /bump: apaga o que não for permitido — não processa o resto.
+    const bumped = await handleBumpChannel(message).catch(() => false);
+    if (bumped) return;
 
     // Mural de fotos: se a mensagem virou post (ou foi apagada no canal), não processa o resto.
     const consumed = await handleInstagramMessage(message).catch(() => false);
