@@ -19,7 +19,7 @@ import { applyColor, applyUrl, errorEmbed, infoEmbed, Palette, successEmbed } fr
 import { isAdminOrOwner } from '../../services/permission.service';
 import { truncate } from '../../utils/formatter';
 
-const ROLE_OPTIONS = ['cargo1', 'cargo2', 'cargo3', 'cargo4', 'cargo5'];
+const ROLE_OPTIONS = ['cargo1', 'cargo2', 'cargo3', 'cargo4', 'cargo5', 'cargo6', 'cargo7', 'cargo8', 'cargo9', 'cargo10'];
 
 // ============ Handlers de componente ============
 
@@ -106,6 +106,21 @@ const component: Component = {
 };
 
 // ============ Comando ============
+
+/** Quebra os botões em linhas de até 5 (limite do Discord por ActionRow). */
+function buildButtonRows(roles: Role[]): ActionRowBuilder<ButtonBuilder>[] {
+  const rows: ActionRowBuilder<ButtonBuilder>[] = [];
+  for (let i = 0; i < roles.length; i += 5) {
+    rows.push(
+      new ActionRowBuilder<ButtonBuilder>().addComponents(
+        ...roles
+          .slice(i, i + 5)
+          .map((role) => new ButtonBuilder().setCustomId(`cargo:${role.id}`).setLabel(truncate(role.name, 80)).setStyle(ButtonStyle.Secondary))
+      )
+    );
+  }
+  return rows;
+}
 
 /** Adiciona as opções comuns aos dois subcomandos (obrigatórias antes das opcionais). */
 function addPanelOptions(sub: SlashCommandSubcommandBuilder): SlashCommandSubcommandBuilder {
@@ -213,13 +228,7 @@ const command: Command = {
                 .addOptions({ label: 'Remover meu cargo', value: 'none', emoji: '❌' })
             )
           ]
-        : [
-            new ActionRowBuilder<ButtonBuilder>().addComponents(
-              ...roles.map((role) =>
-                new ButtonBuilder().setCustomId(`cargo:${role.id}`).setLabel(truncate(role.name, 80)).setStyle(ButtonStyle.Secondary)
-              )
-            )
-          ];
+        : buildButtonRows(roles);
 
     await interaction.channel.send({ embeds: [embed], components });
     const aviso = corInvalida ? '\n⚠️ Cor inválida — usei a cor padrão.' : '';
