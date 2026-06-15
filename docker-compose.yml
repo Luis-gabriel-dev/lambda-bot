@@ -8,10 +8,10 @@ services:
     env_file:
       - .env
     networks:
-      - 1panel-network
+      - icontainer-network
 
 # Rede externa onde os apps do 1Panel (incluindo o Postgres) vivem.
 # Confira o nome real em Container → Redes; se for diferente, ajuste aqui.
 networks:
-  1panel-network:
+  icontainer-network:
     external: true
