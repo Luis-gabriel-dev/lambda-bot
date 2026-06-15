@@ -13,6 +13,7 @@ import { isAdminOrOwner } from '../../services/permission.service';
 import { formatDuration, parseDuration } from '../../utils/time';
 import { discordTimestamp } from '../../utils/formatter';
 import { economyRepository } from '../../repositories/economy.repository';
+import { shopRepository } from '../../repositories/shop.repository';
 import { CURRENCY, handleCollect, postDrop } from '../../services/economy.service';
 
 const component: Component = {
@@ -95,6 +96,25 @@ const command: Command = {
         .setDescription('Remove kurocoins de um membro.')
         .addUserOption((opt) => opt.setName('usuario').setDescription('De quem remover.').setRequired(true))
         .addIntegerOption((opt) => opt.setName('quantia').setDescription('Quantos kurocoins remover.').setMinValue(1).setRequired(true))
+    )
+    .addSubcommand((sub) =>
+      sub
+        .setName('cargo')
+        .setDescription('Gerencia os cargos vendidos na loja (/loja, /comprar).')
+        .addStringOption((opt) =>
+          opt
+            .setName('acao')
+            .setDescription('O que fazer.')
+            .setRequired(true)
+            .addChoices(
+              { name: 'adicionar', value: 'adicionar' },
+              { name: 'remover', value: 'remover' },
+              { name: 'listar', value: 'listar' }
+            )
+        )
+        .addRoleOption((opt) => opt.setName('cargo').setDescription('Cargo (para adicionar/remover).').setRequired(false))
+        .addIntegerOption((opt) => opt.setName('preco').setDescription('Preço em kurocoins (para adicionar).').setMinValue(1).setRequired(false))
+        .addStringOption((opt) => opt.setName('descricao').setDescription('Descrição opcional exibida na loja.').setRequired(false))
     )
     .addSubcommand((sub) => sub.setName('status').setDescription('Mostra a configuração atual da economia.'))
     .addSubcommand((sub) =>
@@ -260,6 +280,65 @@ const command: Command = {
               `➖ Removido **${removed.toLocaleString('pt-BR')}** ${CURRENCY} de ${user}${aviso}.\nNovo saldo: **${wallet.balance.toLocaleString('pt-BR')}** ${CURRENCY}.`
             )
         ]
+      });
+      return;
+    }
+
+    if (sub === 'cargo') {
+      const acao = interaction.options.getString('acao', true);
+
+      if (acao === 'listar') {
+        const roles = await shopRepository.listRoles(guildId);
+        const value =
+          roles.length > 0
+            ? roles.map((r) => `<@&${r.roleId}> — **${r.price.toLocaleString('pt-BR')}** ${CURRENCY}${r.description ? ` (${r.description})` : ''}`).join('\n')
+            : '*nenhum cargo à venda*';
+        await interaction.reply({ embeds: [infoEmbed(`🛒 **Loja de cargos:**\n${value}`)], flags: MessageFlags.Ephemeral });
+        return;
+      }
+
+      const cargo = interaction.options.getRole('cargo');
+      if (!cargo) {
+        await interaction.reply({ embeds: [errorEmbed('Informe o `cargo` para essa ação.')], flags: MessageFlags.Ephemeral });
+        return;
+      }
+
+      if (acao === 'remover') {
+        const removed = await shopRepository.removeRole(guildId, cargo.id);
+        await interaction.reply({
+          embeds: [removed ? successEmbed(`${cargo} foi removido da loja.`) : errorEmbed(`${cargo} não estava à venda.`)],
+          flags: MessageFlags.Ephemeral
+        });
+        return;
+      }
+
+      // adicionar
+      const preco = interaction.options.getInteger('preco');
+      if (!preco) {
+        await interaction.reply({ embeds: [errorEmbed('Informe o `preco` (em kurocoins) para adicionar o cargo.')], flags: MessageFlags.Ephemeral });
+        return;
+      }
+      if (cargo.id === guildId) {
+        await interaction.reply({ embeds: [errorEmbed('Não dá para vender o cargo `@everyone`.')], flags: MessageFlags.Ephemeral });
+        return;
+      }
+
+      const descricao = interaction.options.getString('descricao')?.trim() || null;
+      await shopRepository.addRole(guildId, cargo.id, preco, descricao);
+
+      // Aviso se o bot não conseguirá entregar o cargo (hierarquia/permissão).
+      const me = interaction.guild.members.me;
+      const role = interaction.guild.roles.cache.get(cargo.id);
+      const semPermissao = !me?.permissions.has(PermissionFlagsBits.ManageRoles);
+      const acimaDoBot = me && role ? role.position >= me.roles.highest.position : false;
+      const aviso = semPermissao
+        ? '\n⚠️ Eu não tenho a permissão **Gerenciar Cargos** — não vou conseguir entregar a compra.'
+        : acimaDoBot
+          ? '\n⚠️ Esse cargo está **acima do meu** na hierarquia — mova meu cargo acima dele para eu conseguir entregá-lo.'
+          : '';
+      await interaction.reply({
+        embeds: [successEmbed(`${cargo} está à venda por **${preco.toLocaleString('pt-BR')}** ${CURRENCY}.${aviso}`)],
+        flags: MessageFlags.Ephemeral
       });
       return;
     }

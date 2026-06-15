@@ -47,6 +47,7 @@ model GuildConfig {
   welcomeRulesChannelId String? // canal de regras citado nas boas-vindas
   welcomeColorChannelId String? // canal de cor de perfil citado nas boas-vindas
   welcomeColor          Int? // cor fixa do embed (null = aleatória entre 40 cores)
+  welcomeExtraText      String? // texto extra opcional anexado ao fim da descrição das boas-vindas
   trapChannelId         String? // canal-armadilha: quem mandar mensagem aqui leva kick
   dmImageUrl            String? // imagem padrão usada em todos os embeds de DM do bot
   bumpChannelId         String? // canal exclusivo de /bump (apaga o que não for /bump)
@@ -55,6 +56,7 @@ model GuildConfig {
   partnerPublicChannelId   String? // canal do embed público "fez parceria"
   partnerImageUrl          String? // imagem customizável do embed público de parceria
   partnerCategoryId        String? // categoria onde os canais de ticket de parceria são criados
+  partnerWelcomeText       String? // descrição custom do embed de boas-vindas do ticket de parceria
 }
 
 /// Cargos autorizados a ver/confirmar tickets de parceria.
@@ -307,6 +309,18 @@ model InstaLike {
   post   InstaPost @relation(fields: [postId], references: [id], onDelete: Cascade)
 
   @@unique([postId, userId])
+}
+
+/// Cargo comprável na loja (preço em kurocoins).
+model ShopRole {
+  id          Int      @id @default(autoincrement())
+  guildId     String
+  roleId      String
+  price       Int
+  description String? // texto opcional exibido na loja
+  createdAt   DateTime @default(now())
+
+  @@unique([guildId, roleId])
 }
 
 /// Configuração da economia (kurocoins) por servidor.

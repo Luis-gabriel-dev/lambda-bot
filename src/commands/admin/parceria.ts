@@ -20,6 +20,7 @@ import {
   buildPartnershipTranscript,
   buildPublicPartnerEmbed,
   createPartnershipChannel,
+  DEFAULT_PARTNER_WELCOME,
   isPartnerStaff,
   stripMassMentions
 } from '../../services/partnership.service';
@@ -71,11 +72,7 @@ async function handleOpen(interaction: ButtonInteraction): Promise<void> {
   const welcome = new EmbedBuilder()
     .setColor(Palette.info)
     .setTitle('🤝 Pedido de parceria')
-    .setDescription(
-      'Envie aqui o **convite do seu servidor** junto com o texto de divulgação.\n\n' +
-        'Assim que você mandar o convite, a equipe vai analisar e confirmar a parceria. ' +
-        'Pode mandar gif e formatação à vontade — não precisa marcar `@everyone`/`@here`.'
-    )
+    .setDescription(config?.partnerWelcomeText ?? DEFAULT_PARTNER_WELCOME)
     .setTimestamp();
   const mention = [interaction.member.toString(), ...supportRoleIds.map((id) => `<@&${id}>`)].join(' ');
   await channel.send({ content: mention, embeds: [welcome], components: [closeRow(channel.id)] });
@@ -271,6 +268,12 @@ const command: Command = {
         .setDescription('Imagem do embed público (ou "remover").')
         .addStringOption((opt) => opt.setName('url').setDescription('URL da imagem, ou "remover".').setRequired(true))
     )
+    .addSubcommand((sub) =>
+      sub
+        .setName('boasvindas')
+        .setDescription('Texto do embed mostrado ao abrir o ticket (use \\n; vazio volta ao padrão).')
+        .addStringOption((opt) => opt.setName('texto').setDescription('Texto do welcome. Deixe vazio para voltar ao padrão.').setRequired(false))
+    )
     .addSubcommand((sub) => sub.setName('status').setDescription('Mostra a configuração de parcerias.')),
 
   components: [component],
@@ -364,6 +367,19 @@ const command: Command = {
       return;
     }
 
+    // ----- /parceria boasvindas -----
+    if (sub === 'boasvindas') {
+      const texto = interaction.options.getString('texto')?.replace(/\\n/g, '\n').trim();
+      if (!texto) {
+        await partnershipRepository.setWelcomeText(guildId, null);
+        await interaction.reply({ embeds: [successEmbed('Texto de boas-vindas do ticket de parceria voltou ao **padrão**.')], flags: MessageFlags.Ephemeral });
+        return;
+      }
+      await partnershipRepository.setWelcomeText(guildId, truncate(texto, 2000));
+      await interaction.reply({ embeds: [successEmbed('Texto de boas-vindas do ticket de parceria atualizado.')], flags: MessageFlags.Ephemeral });
+      return;
+    }
+
     // ----- /parceria status -----
     if (sub === 'status') {
       const config = await partnershipRepository.getConfig(guildId);
@@ -378,6 +394,7 @@ const command: Command = {
         `**Cargo @parceria:** ${fmtRole(config?.partnerNotifyRoleId)}\n` +
         `**Log público:** ${fmtCh(config?.partnerPublicChannelId)}\n` +
         `**Imagem do log:** ${config?.partnerImageUrl ? '✅ definida' : '*padrão*'}\n` +
+        `**Boas-vindas do ticket:** ${config?.partnerWelcomeText ? '✅ custom' : '*padrão*'}\n` +
         `**Transcript:** configure em \`/logs\` o tipo **Parcerias**.`;
       await interaction.reply({ embeds: [infoEmbed(desc)], flags: MessageFlags.Ephemeral });
       return;

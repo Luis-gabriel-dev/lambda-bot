@@ -25,6 +25,12 @@ const INVITE_RE =
 
 const PARTNER_FOOTER = 'Feito com carinho e amor por Kuro ❤️';
 
+/** Texto padrão do embed de boas-vindas do ticket de parceria (customizável por servidor). */
+export const DEFAULT_PARTNER_WELCOME =
+  'Envie aqui o **convite do seu servidor** junto com o texto de divulgação.\n\n' +
+  'Assim que você mandar o convite, a equipe vai analisar e confirmar a parceria. ' +
+  'Pode mandar gif e formatação à vontade — não precisa marcar `@everyone`/`@here`.';
+
 /** É staff de parcerias? (cargo autorizado configurado ou administrador) */
 export function isPartnerStaff(member: GuildMember, supportRoleIds: string[]): boolean {
   if (member.permissions.has(PermissionFlagsBits.Administrator)) return true;

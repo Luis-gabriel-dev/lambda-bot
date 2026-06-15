@@ -76,6 +76,8 @@ export interface WelcomeOptions {
   imageUrl?: string | null;
   rulesChannelId?: string | null;
   colorChannelId?: string | null;
+  /** Texto extra opcional, anexado ao fim da descrição. */
+  extraText?: string | null;
   /** Cor já resolvida do embed; se ausente, sorteia uma das 40 cores. */
   color?: number;
 }
@@ -93,7 +95,12 @@ export function buildWelcome(member: GuildMember, opts: WelcomeOptions = {}): { 
   const extra: string[] = [];
   if (opts.rulesChannelId) extra.push(`Leia as regras do servidor em <#${opts.rulesChannelId}>`);
   if (opts.colorChannelId) extra.push(`E caso queira uma cor diferente no seu perfil, você pode ir em <#${opts.colorChannelId}>`);
-  const description = extra.length > 0 ? `${intro}\n\n${extra.join('\n')}` : intro;
+
+  // Blocos da descrição: intro → linhas de canais → texto extra custom (cada um separado por linha em branco).
+  const parts = [intro];
+  if (extra.length > 0) parts.push(extra.join('\n'));
+  if (opts.extraText) parts.push(opts.extraText);
+  const description = parts.join('\n\n');
 
   const embed = new EmbedBuilder()
     .setColor(opts.color ?? pickRandomColor())
@@ -128,6 +135,7 @@ export async function sendWelcome(member: GuildMember): Promise<void> {
     imageUrl: config.welcomeImageUrl,
     rulesChannelId: config.welcomeRulesChannelId,
     colorChannelId: config.welcomeColorChannelId,
+    extraText: config.welcomeExtraText,
     color
   });
   await channel

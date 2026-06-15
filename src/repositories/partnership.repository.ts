@@ -58,6 +58,15 @@ export const partnershipRepository = {
     });
   },
 
+  /** Define (ou limpa, voltando ao padrão) a descrição do welcome do ticket de parceria. */
+  async setWelcomeText(guildId: string, text: string | null): Promise<void> {
+    await prisma.guildConfig.upsert({
+      where: { guildId },
+      create: { guildId, partnerWelcomeText: text },
+      update: { partnerWelcomeText: text }
+    });
+  },
+
   // ---- Cargos autorizados (PartnerSupportRole) ----
   async addSupportRole(guildId: string, roleId: string): Promise<void> {
     await prisma.partnerSupportRole.upsert({

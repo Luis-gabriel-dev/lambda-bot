@@ -118,6 +118,27 @@ export const economyRepository = {
   },
 
   /**
+   * Debita kurocoins de forma atômica (para compras). Retorna ok=false sem alterar
+   * nada se o saldo for insuficiente; senão debita e retorna o novo saldo.
+   */
+  async spend(guildId: string, userId: string, amount: number): Promise<{ ok: boolean; balance: number }> {
+    return prisma.$transaction(async (tx) => {
+      const wallet = await tx.wallet.upsert({
+        where: { guildId_userId: { guildId, userId } },
+        create: { guildId, userId },
+        update: {}
+      });
+      if (wallet.balance < amount) return { ok: false, balance: wallet.balance };
+
+      const updated = await tx.wallet.update({
+        where: { guildId_userId: { guildId, userId } },
+        data: { balance: { decrement: amount } }
+      });
+      return { ok: true, balance: updated.balance };
+    });
+  },
+
+  /**
    * Transfere kurocoins de um membro para outro, de forma atômica. Retorna ok=false
    * (sem alterar nada) se o remetente não tiver saldo suficiente.
    */

@@ -11,6 +11,7 @@ import { applyColor, applyUrl, errorEmbed, infoEmbed, successEmbed } from '../..
 import { isAdminOrOwner } from '../../services/permission.service';
 import { guildConfigRepository } from '../../repositories/guildConfig.repository';
 import { buildWelcome, resolveWelcomeColor } from '../../services/welcome.service';
+import { truncate } from '../../utils/formatter';
 
 const command: Command = {
   data: new SlashCommandBuilder()
@@ -48,6 +49,12 @@ const command: Command = {
         .setName('cor-embed')
         .setDescription('Cor fixa do embed (vazio = cor do avatar do membro, senão aleatória).')
         .addStringOption((opt) => opt.setName('cor').setDescription('Cor #RRGGBB ou nome (ex.: Blurple). Vazio = automática.').setRequired(false))
+    )
+    .addSubcommand((sub) =>
+      sub
+        .setName('texto')
+        .setDescription('Texto extra no fim da descrição (use \\n para pular linha; vazio remove).')
+        .addStringOption((opt) => opt.setName('texto').setDescription('Texto a adicionar. Deixe vazio para remover.').setRequired(false))
     )
     .addSubcommand((sub) => sub.setName('testar').setDescription('Mostra uma prévia das boas-vindas com o seu perfil.'))
     .addSubcommand((sub) => sub.setName('desativar').setDescription('Desativa as boas-vindas.'))
@@ -136,6 +143,21 @@ const command: Command = {
       return;
     }
 
+    if (sub === 'texto') {
+      const texto = interaction.options.getString('texto')?.replace(/\\n/g, '\n').trim();
+      if (!texto) {
+        await guildConfigRepository.setWelcomeExtraText(guildId, null);
+        await interaction.reply({ embeds: [successEmbed('Texto extra das boas-vindas removido.')], flags: MessageFlags.Ephemeral });
+        return;
+      }
+      await guildConfigRepository.setWelcomeExtraText(guildId, truncate(texto, 1500));
+      await interaction.reply({
+        embeds: [successEmbed('Texto extra das boas-vindas atualizado. Veja com **/boasvindas testar**.')],
+        flags: MessageFlags.Ephemeral
+      });
+      return;
+    }
+
     if (sub === 'desativar') {
       await guildConfigRepository.setWelcomeChannel(guildId, null);
       await interaction.reply({ embeds: [successEmbed('Boas-vindas desativadas.')], flags: MessageFlags.Ephemeral });
@@ -153,10 +175,11 @@ const command: Command = {
           ? `\`#${config.welcomeColor.toString(16).padStart(6, '0')}\``
           : '*automática (avatar → aleatória)*';
       const ativo = config?.welcomeChannelId ? '🟢 ativo' : '🔴 inativo (defina um canal)';
+      const textoExtra = config?.welcomeExtraText ? '✅ definido' : '*nenhum*';
       await interaction.reply({
         embeds: [
           infoEmbed(
-            `**Boas-vindas**\nStatus: ${ativo}\nCanal: ${canal}\nImagem: ${imagem}\nCanal de regras: ${regras}\nCanal de cor de perfil: ${corCanal}\nCor do embed: ${cor}`
+            `**Boas-vindas**\nStatus: ${ativo}\nCanal: ${canal}\nImagem: ${imagem}\nCanal de regras: ${regras}\nCanal de cor de perfil: ${corCanal}\nCor do embed: ${cor}\nTexto extra: ${textoExtra}`
           )
         ],
         flags: MessageFlags.Ephemeral
@@ -171,6 +194,7 @@ const command: Command = {
       imageUrl: config?.welcomeImageUrl,
       rulesChannelId: config?.welcomeRulesChannelId,
       colorChannelId: config?.welcomeColorChannelId,
+      extraText: config?.welcomeExtraText,
       color
     });
     await interaction.reply({

@@ -75,6 +75,15 @@ export const guildConfigRepository = {
     });
   },
 
+  /** Define (ou limpa) o texto extra anexado ao fim da descrição das boas-vindas. */
+  async setWelcomeExtraText(guildId: string, text: string | null): Promise<void> {
+    await prisma.guildConfig.upsert({
+      where: { guildId },
+      create: { guildId, welcomeExtraText: text },
+      update: { welcomeExtraText: text }
+    });
+  },
+
   /** Define (ou limpa) o canal-armadilha (/trap). */
   async setTrapChannel(guildId: string, channelId: string | null): Promise<void> {
     await prisma.guildConfig.upsert({
