@@ -19,9 +19,15 @@ import { EconomyConfig, Wallet } from '@prisma/client';
 import { economyRepository } from '../repositories/economy.repository';
 import { errorEmbed } from '../utils/embeds';
 import { discordTimestamp } from '../utils/formatter';
+import { config } from '../core/config';
+import { isOwner } from './permission.service';
 
 export const CURRENCY = 'kurocoins';
 export const GOLD = 0xf1c40f;
+
+// "Mistério": os números do dono do bot ficam escondidos no público (revela só em /kuro).
+const MASK_AMOUNT = '???';
+const MASK_COUNT = '?';
 
 // Mensagens por faixa de valor (use {n} para a quantia).
 const LOW_MESSAGES = [
@@ -90,15 +96,16 @@ export function buildClaimedEmbed(userTag: string, amount: number): EmbedBuilder
 }
 
 export function buildProfileEmbed(user: User, wallet: Wallet, rank: number): EmbedBuilder {
+  const masked = isOwner(user.id); // o dono é um mistério no público
   return new EmbedBuilder()
     .setColor(GOLD)
     .setTitle(`Perfil de ${user.username}`)
     .setThumbnail(user.displayAvatarURL({ size: 256 }))
     .addFields(
-      { name: '💰 Saldo', value: `**${wallet.balance}** ${CURRENCY}`, inline: true },
-      { name: '🏆 Ranking', value: `#${rank}`, inline: true },
-      { name: '🔢 Coletas', value: `${wallet.collectCount}`, inline: true },
-      { name: '📥 Total coletado', value: `${wallet.totalCollected} ${CURRENCY}`, inline: true },
+      { name: '💰 Saldo', value: masked ? `**${MASK_AMOUNT}** ${CURRENCY}` : `**${wallet.balance}** ${CURRENCY}`, inline: true },
+      { name: '🏆 Ranking', value: masked ? '👑' : `#${rank}`, inline: true },
+      { name: '🔢 Coletas', value: masked ? MASK_COUNT : `${wallet.collectCount}`, inline: true },
+      { name: '📥 Total coletado', value: masked ? `${MASK_AMOUNT} ${CURRENCY}` : `${wallet.totalCollected} ${CURRENCY}`, inline: true },
       { name: '📅 Perfil criado', value: discordTimestamp(wallet.createdAt, 'D'), inline: true }
     );
 }
@@ -162,24 +169,46 @@ async function buildRankingContainer(
   guildId: string,
   page: number
 ): Promise<{ container: ContainerBuilder; page: number } | null> {
-  const total = await economyRepository.countRanked(guildId);
-  if (total === 0) return null;
+  // O dono fica sempre no topo (#1), com os números escondidos. Só é fixado se estiver no servidor.
+  const ownerId = config.ownerId;
+  const guild = client.guilds.cache.get(guildId);
+  const ownerMember = guild ? await guild.members.fetch(ownerId).catch(() => null) : null;
+  const pinOwner = !!ownerMember;
+
+  const total = await economyRepository.countRanked(guildId, pinOwner ? ownerId : undefined);
+  if (total === 0 && !pinOwner) return null;
 
   const totalPages = Math.max(1, Math.ceil(total / RANK_PAGE_SIZE));
   const safePage = Math.min(Math.max(0, page), totalPages - 1);
-  const wallets = await economyRepository.getTopWallets(guildId, safePage * RANK_PAGE_SIZE, RANK_PAGE_SIZE);
+  const wallets = await economyRepository.getTopWallets(guildId, safePage * RANK_PAGE_SIZE, RANK_PAGE_SIZE, pinOwner ? ownerId : undefined);
 
   const container = new ContainerBuilder().setAccentColor(GOLD);
   container.addTextDisplayComponents(
-    new TextDisplayBuilder().setContent(`## 🏆 Ranking de ${CURRENCY}\nPágina ${safePage + 1}/${totalPages} • ${total} no ranking`)
+    new TextDisplayBuilder().setContent(
+      `## 🏆 Ranking de ${CURRENCY}\nPágina ${safePage + 1}/${totalPages} • ${total + (pinOwner ? 1 : 0)} no ranking`
+    )
   );
+
+  // Fixa o dono como #1 (mascarado) só na primeira página.
+  if (pinOwner && ownerMember && safePage === 0) {
+    const avatar = ownerMember.displayAvatarURL({ size: 128, extension: 'png' }) ?? DEFAULT_AVATAR;
+    container.addSeparatorComponents(new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small));
+    container.addSectionComponents(
+      new SectionBuilder()
+        .addTextDisplayComponents(
+          new TextDisplayBuilder().setContent(`**🥇** <@${ownerId}> 👑\n💰 **${MASK_AMOUNT}** ${CURRENCY} • ${MASK_COUNT} coleta(s)`)
+        )
+        .setThumbnailAccessory(new ThumbnailBuilder().setURL(avatar))
+    );
+  }
 
   let rank = safePage * RANK_PAGE_SIZE;
   for (const wallet of wallets) {
     rank++;
+    const displayRank = pinOwner ? rank + 1 : rank; // o dono ocupa o #1
     const user = await client.users.fetch(wallet.userId).catch(() => null);
     const name = user ? `<@${wallet.userId}>` : `Usuário desconhecido`;
-    const medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : `#${rank}`;
+    const medal = displayRank === 1 ? '🥇' : displayRank === 2 ? '🥈' : displayRank === 3 ? '🥉' : `#${displayRank}`;
     const avatar = user?.displayAvatarURL({ size: 128, extension: 'png' }) ?? DEFAULT_AVATAR;
 
     container.addSeparatorComponents(new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small));

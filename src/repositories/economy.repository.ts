@@ -175,14 +175,21 @@ export const economyRepository = {
     return richer + 1;
   },
 
-  /** Quantidade de membros com saldo positivo (entram no ranking). */
-  async countRanked(guildId: string): Promise<number> {
-    return prisma.wallet.count({ where: { guildId, balance: { gt: 0 } } });
+  /** Quantidade de membros com saldo positivo (entram no ranking). Pode excluir um usuário (ex.: o dono fixado). */
+  async countRanked(guildId: string, excludeUserId?: string): Promise<number> {
+    return prisma.wallet.count({
+      where: { guildId, balance: { gt: 0 }, ...(excludeUserId ? { userId: { not: excludeUserId } } : {}) }
+    });
   },
 
-  /** Página do ranking de saldo (maior primeiro). */
-  async getTopWallets(guildId: string, skip: number, take: number): Promise<Wallet[]> {
-    return prisma.wallet.findMany({ where: { guildId, balance: { gt: 0 } }, orderBy: { balance: 'desc' }, skip, take });
+  /** Página do ranking de saldo (maior primeiro). Pode excluir um usuário (ex.: o dono fixado). */
+  async getTopWallets(guildId: string, skip: number, take: number, excludeUserId?: string): Promise<Wallet[]> {
+    return prisma.wallet.findMany({
+      where: { guildId, balance: { gt: 0 }, ...(excludeUserId ? { userId: { not: excludeUserId } } : {}) },
+      orderBy: { balance: 'desc' },
+      skip,
+      take
+    });
   },
 
   // ---- Drops ----
