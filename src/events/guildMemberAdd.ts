@@ -28,9 +28,15 @@ const event: Event<'guildMemberAdd'> = {
     // Boas-vindas no canal público (separado do log de entrada abaixo).
     await sendWelcome(member);
 
+    // Conta nova (≤ 7 dias) → destaca o log em amarelo com aviso.
+    const NEW_ACCOUNT_DAYS = 7;
+    const ageMs = Date.now() - member.user.createdTimestamp;
+    const ageDays = ageMs / 86_400_000;
+    const isNew = ageDays <= NEW_ACCOUNT_DAYS;
+
     const embed = new EmbedBuilder()
-      .setColor(Palette.success)
-      .setTitle('📥 Membro entrou')
+      .setColor(isNew ? Palette.warning : Palette.success)
+      .setTitle(isNew ? '📥 Membro entrou — 🆕 conta nova!' : '📥 Membro entrou')
       .setThumbnail(member.user.displayAvatarURL({ size: 256 }))
       .addFields(
         { name: 'Usuário', value: `${member.user} \`${member.user.tag}\`` },
@@ -42,6 +48,17 @@ const event: Event<'guildMemberAdd'> = {
         }
       )
       .setTimestamp();
+
+    if (isNew) {
+      const idade =
+        ageDays >= 1
+          ? `${Math.floor(ageDays)} dia(s)`
+          : `${Math.max(1, Math.floor(ageMs / 3_600_000))} hora(s)`;
+      embed.addFields({
+        name: '⚠️ Atenção: conta recém-criada',
+        value: `🆕 A conta tem só **${idade}** de criada. 👀 Possível conta nova/descartável — fique de olho.`
+      });
+    }
 
     await sendLog(member.guild, 'entrada', embed);
   }
