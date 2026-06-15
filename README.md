@@ -2,7 +2,7 @@
 
 🌐 **[English](#english) · [Português](#português)**
 
-A feature-rich Discord bot built with **TypeScript** and **discord.js v14**: moderation with warn escalation, automod, tickets, giveaways, polls, configurable logging, a mini-Instagram, a **kurocoins** economy and welcome messages — all on a scalable, layered architecture (commands, events, services, repositories, jobs, loaders) backed by **Prisma + SQLite**.
+A feature-rich Discord bot built with **TypeScript** and **discord.js v14**: moderation with warn escalation, automod, tickets, server **partnerships**, giveaways, polls, configurable logging, a mini-Instagram (photos & videos), a **kurocoins** economy with a **role shop**, and welcome messages — all on a scalable, layered architecture (commands, events, services, repositories, jobs, loaders) backed by **Prisma + SQLite**.
 
 ---
 
@@ -29,24 +29,30 @@ All **admin** commands require the *Administrator* permission; **moderation** co
 
 **Trap** (`/trap`) — a honeypot channel: anyone who posts there is **kicked instantly** (the owner, the bot and exempt roles are spared). Catches spam bots and doubles as a server prank.
 
+**Bump** (`/config bump`) — a channel where members may only run `/bump` (the Disboard command); any other message is deleted. Bots, the owner and configured roles are exempt.
+
 **Tickets** (`/ticket`) — button panels that open private channels, with transcripts on close.
+
+**Partnerships** (`/parceria`) — a dedicated partnership flow on top of tickets: a panel opens a private channel; when the requester posts their server invite, staff get a **confirm / refuse** prompt. On confirm the bot posts the pitch in an announcement channel (stripping `@everyone`/`@here`, pinging a configurable `@parceria` role and the requester) and drops a public *"partnership closed"* embed colored by the closer's avatar, with a **per-admin counter**. Closing the ticket saves a transcript (participants, invite, server name) to the partnership log. Invites a staffer posts straight into the announcement channel are counted too. The opening message text is customizable (`/parceria boasvindas`).
 
 **Giveaways** (`/sorteio`) — timed giveaways with image/color, custom requirements (role/Nitro/activity/free-text) and auto-finalize.
 
 **Polls** (`/enquete`) — button voting with optional auto-close and auto-delete timers.
 
-**Logging** (`/logs`) — per-type log channels: punishments, bans, joins/leaves, messages, calls, tickets, moderation, roles, and **server** (emojis, stickers, channels and threads — create/delete, with the executor resolved from the audit log).
+**Logging** (`/logs`) — per-type log channels: punishments, bans, joins/leaves, messages, calls, tickets, moderation, roles, **server** (emojis, stickers, channels and threads — create/delete, with the executor resolved from the audit log), **Instagram** and **partnership transcripts**. New accounts (**≤ 7 days old**) are flagged in the join log with a yellow embed and a warning.
 
-**Mini Instagram** (`/instagram`) — photo channels where each image becomes a post with likes, comments (threads), a "who liked" list and a custom disclaimer.
+**Mini Instagram** (`/instagram`) — photo/video channels where each upload becomes a **Components V2 card**: author line, optional title and caption, live like/comment counts (comments via threads), a "who liked" list and a card color taken from the media's dominant color. The info disclaimer supports a custom image and color; deleted posts are logged.
 
 **Economy — kurocoins** (`/economia`)
 - Timed money drops in a channel with a **Coletar** button (first click wins); high values are rarer; random GIFs; configurable interval/min-max and auto-delete of drop messages.
 - **`/perfil`**, **`/saldo`**, **`/ranking`** (paginated, one avatar per row) and **`/pagar`** (member-to-member transfer).
+- **Role shop** — `/economia cargo` sets which roles are buyable and their price; members browse with **`/loja`** (panel with balance + a buy menu) or buy directly with **`/comprar`**. Purchases debit atomically and **refund** if the role can't be assigned.
+- **Mystery** — the bot owner is always pinned at the top of `/ranking` with balance/collects masked as `???`/`?` (also masked in `/saldo` and `/perfil`); **`/kuro`** privately reveals the real numbers.
 - Admin: `/economia dar|tirar` (give/take coins), `/economia forcar` (force a drop, optional exact amount).
 
-**Welcome** (`/boasvindas`) — public welcome message on join: avatar (circular + square), name, handle, join time, an optional fixed image/gif, and a ping to the new member.
+**Welcome** (`/boasvindas`) — public welcome message on join: avatar (circular + square), name, handle, join time, an optional fixed image/gif and a ping to the new member. The embed color can be fixed or pulled from the member's avatar (random palette fallback), it can cite a rules channel and a profile-color channel, and an optional extra text block (`/boasvindas texto`) is appended to the description.
 
-**Onboarding & roles** — **`/autorole`** (auto role on join), **`/cargo`** (role management), **`/permissao`** (authorize roles for restricted commands).
+**Onboarding & roles** — **`/autorole`** (auto role on join), **`/cargo`** (role panels with buttons or a select menu, up to **10 roles**), **`/permissao`** (authorize roles for restricted commands), **`/dm`** (standardize a fixed banner image across every DM the bot sends).
 
 ### Requirements
 
@@ -79,12 +85,14 @@ npm run dev
 DISCORD_TOKEN=your_bot_token
 CLIENT_ID=application_id
 GUILD_ID=server_id
+OWNER_ID=your_user_id
 DATABASE_URL="file:./dev.db"
 ```
 
 - **DISCORD_TOKEN** — bot token (Developer Portal → your app → *Bot* → *Reset Token*).
 - **CLIENT_ID** — *Application ID* (Developer Portal → *General Information*).
 - **GUILD_ID** — server ID where commands are registered. Enable *Developer Mode* (Settings → Advanced), right-click the server → *Copy Server ID*.
+- **OWNER_ID** — your Discord user ID (the bot owner). Bypasses every permission check and unlocks owner-only features like `/kuro`. Right-click your name → *Copy User ID*.
 - **DATABASE_URL** — SQLite file used by Prisma (default is fine).
 
 > The `.env` is in `.gitignore` and must **never** be committed or shared — it contains the bot token.
@@ -105,6 +113,7 @@ https://discord.com/oauth2/authorize?client_id=YOUR_CLIENT_ID&scope=bot%20applic
 | `npm run build` | Compiles TypeScript to `dist/`. |
 | `npm start` | Runs the compiled bot (`dist/index.js`). |
 | `npm run deploy` | Registers/updates the slash commands on the server. Run after adding or changing a command's definition. |
+| `npm run deploy:prod` | Same as `deploy`, but runs the compiled script from `dist/` — for production/VPS (run `npm run build` first). |
 | `npm run db:push` | Syncs the Prisma schema to the SQLite database. |
 | `npm run db:studio` | Opens Prisma Studio to inspect the database. |
 | `npm run typecheck` | Type-checks without emitting files. |
@@ -115,13 +124,13 @@ https://discord.com/oauth2/authorize?client_id=YOUR_CLIENT_ID&scope=bot%20applic
 src/
 ├── core/            # client, config, logger, database (infra)
 ├── commands/        # slash commands grouped by domain
-│   ├── admin/       #   logs, automod, ticket, sorteio, enquete, instagram, painel, boasvindas, autorole, cargo, permissao
-│   ├── economy/     #   economia, perfil, saldo, ranking, pagar
+│   ├── admin/       #   logs, automod, links, gifs, trap, config(bump), ticket, parceria, sorteio, enquete, instagram, painel, dm, boasvindas, autorole, cargo, permissao
+│   ├── economy/     #   economia, loja, comprar, perfil, saldo, ranking, kuro, pagar
 │   ├── moderation/  #   ban, unban, kick, mute, unmute, warn, clear, grace
 │   └── utility/     #   embed, ping, serverinfo, userinfo, avatar
 ├── events/          # gateway events (interactionCreate, guildMemberAdd, message*, server-log events)
 ├── jobs/            # scheduled tasks (warn penalties, giveaways, polls, economy drops, log cleanup)
-├── services/        # business logic (moderation, automod, log, instagram, economy, welcome, permission)
+├── services/        # business logic (moderation, automod, log, instagram, economy, shop, welcome, partnership, bump, trap, permission)
 ├── repositories/    # data access via Prisma
 ├── interfaces/      # contracts (Command, Event, Component, Config)
 ├── utils/           # embeds, permissions, time, formatter, auditLog
@@ -131,7 +140,7 @@ src/
 ├── index.ts         # entry point
 └── deploy.ts        # slash-command registration script
 prisma/
-└── schema.prisma    # all data models (warnings, tickets, giveaways, polls, logs, instagram, economy, ...)
+└── schema.prisma    # all data models (warnings, tickets, partnerships, giveaways, polls, logs, instagram, economy, shop, ...)
 ```
 
 **How it fits together:** `index.ts` calls `app.ts`, which creates the client and runs the loaders. `commandLoader` reads every file under `commands/`, registers each command and its button/modal handlers (components). `interactionCreate` routes slash commands by name and component interactions by the customId prefix (e.g. `embed:send` → the `embed` component handler). Background work (giveaways, polls, economy drops, warn penalties) runs on intervals scheduled from the `ready` event.
@@ -168,24 +177,30 @@ Todos os comandos de **admin** exigem a permissão *Administrador*; os de **mode
 
 **Trap** (`/trap`) — canal-armadilha: quem postar nele leva **kick na hora** (o dono, o bot e cargos isentos são poupados). Pega bots de spam e serve de brincadeira no servidor.
 
+**Bump** (`/config bump`) — canal onde os membros só podem usar `/bump` (o comando do Disboard); qualquer outra mensagem é apagada. Bots, o dono e cargos configurados são liberados.
+
 **Tickets** (`/ticket`) — painéis de botão que abrem canais privados, com transcrição ao fechar.
+
+**Parcerias** (`/parceria`) — fluxo de parceria sobre os tickets: um painel abre um canal privado; quando a pessoa manda o convite do servidor dela, a staff recebe um prompt de **fechar / recusar**. Ao fechar, o bot publica o texto num canal de anúncio (removendo `@everyone`/`@here`, marcando um cargo `@parceria` configurável e quem pediu) e lança um embed público de *"parceria fechada"* colorido pelo avatar de quem fechou, com um **contador por admin**. Ao fechar o ticket, salva um transcript (participantes, convite, nome do servidor) no log de parcerias. Convites que um staffer posta direto no canal de anúncio também contam. O texto da mensagem de abertura é customizável (`/parceria boasvindas`).
 
 **Sorteios** (`/sorteio`) — sorteios com tempo, imagem/cor, requisitos customizados (cargo/Nitro/atividade/texto livre) e finalização automática.
 
 **Enquetes** (`/enquete`) — votação por botões, com auto-encerramento e auto-deleção opcionais.
 
-**Logs** (`/logs`) — canais de log por tipo: punições, bans, entrada/saída, mensagens, calls, tickets, moderação, cargos e **servidor** (emojis, figurinhas, canais e tópicos — criação/exclusão, com o autor vindo do audit log).
+**Logs** (`/logs`) — canais de log por tipo: punições, bans, entrada/saída, mensagens, calls, tickets, moderação, cargos, **servidor** (emojis, figurinhas, canais e tópicos — criação/exclusão, com o autor vindo do audit log), **Instagram** e **transcripts de parceria**. Contas novas (**≤ 7 dias**) são destacadas no log de entrada com embed amarelo e um aviso.
 
-**Mini Instagram** (`/instagram`) — canais de foto onde cada imagem vira um post com curtidas, comentários (threads), lista de "quem curtiu" e um aviso customizável.
+**Mini Instagram** (`/instagram`) — canais de foto/vídeo onde cada envio vira um **card Components V2**: linha de autor, título e legenda opcionais, contagem de curtidas/comentários ao vivo (comentários por threads), lista de "quem curtiu" e cor do card a partir da cor predominante da mídia. O aviso de informações aceita imagem e cor customizadas; posts apagados vão para o log.
 
 **Economia — kurocoins** (`/economia`)
 - Drops de dinheiro num canal com botão **Coletar** (primeiro a clicar leva); valores altos mais raros; GIFs aleatórios; intervalo/mín-máx configuráveis e auto-deleção das mensagens de drop.
 - **`/perfil`**, **`/saldo`**, **`/ranking`** (paginado, um avatar por linha) e **`/pagar`** (transferência entre membros).
+- **Loja de cargos** — `/economia cargo` define quais cargos são compráveis e o preço; os membros veem com **`/loja`** (painel com saldo + menu de compra) ou compram direto com **`/comprar`**. A compra debita de forma atômica e **estorna** se o cargo não puder ser entregue.
+- **Mistério** — o dono do bot fica sempre fixado no topo do `/ranking` com saldo/coletas mascarados como `???`/`?` (também mascarados em `/saldo` e `/perfil`); **`/kuro`** revela os números reais só pra ele.
 - Admin: `/economia dar|tirar` (dar/tirar moedas), `/economia forcar` (soltar drop, com quantia exata opcional).
 
-**Boas-vindas** (`/boasvindas`) — mensagem pública na entrada: avatar (circular + quadrado), nome, usuário, hora de entrada, imagem/gif fixa opcional e marcação do novo membro.
+**Boas-vindas** (`/boasvindas`) — mensagem pública na entrada: avatar (circular + quadrado), nome, usuário, hora de entrada, imagem/gif fixa opcional e marcação do novo membro. A cor do embed pode ser fixa ou vir do avatar do membro (com paleta aleatória de reserva), pode citar um canal de regras e um canal de cor de perfil, e um bloco de texto extra opcional (`/boasvindas texto`) é anexado à descrição.
 
-**Entrada & cargos** — **`/autorole`** (cargo automático ao entrar), **`/cargo`** (gestão de cargos), **`/permissao`** (autoriza cargos nos comandos restritos).
+**Entrada & cargos** — **`/autorole`** (cargo automático ao entrar), **`/cargo`** (painéis de cargo com botões ou menu de seleção, até **10 cargos**), **`/permissao`** (autoriza cargos nos comandos restritos), **`/dm`** (padroniza uma imagem fixa em todas as DMs que o bot envia).
 
 ### Pré-requisitos
 
@@ -218,12 +233,14 @@ npm run dev
 DISCORD_TOKEN=seu_token_do_bot
 CLIENT_ID=id_da_aplicacao
 GUILD_ID=id_do_servidor
+OWNER_ID=seu_id_de_usuario
 DATABASE_URL="file:./dev.db"
 ```
 
 - **DISCORD_TOKEN** — token do bot (Developer Portal → sua aplicação → *Bot* → *Reset Token*).
 - **CLIENT_ID** — *Application ID* (Developer Portal → *General Information*).
 - **GUILD_ID** — ID do servidor onde os comandos são registrados. Ative o *Modo Desenvolvedor* (Configurações → Avançado), botão direito no servidor → *Copiar ID do servidor*.
+- **OWNER_ID** — seu ID de usuário do Discord (o dono do bot). Ignora todas as checagens de permissão e libera recursos exclusivos do dono, como o `/kuro`. Botão direito no seu nome → *Copiar ID de usuário*.
 - **DATABASE_URL** — arquivo SQLite usado pelo Prisma (o padrão já serve).
 
 > O `.env` está no `.gitignore` e **nunca** deve ser commitado nem compartilhado — ele contém o token do bot.
@@ -244,6 +261,7 @@ https://discord.com/oauth2/authorize?client_id=SEU_CLIENT_ID&scope=bot%20applica
 | `npm run build` | Compila o TypeScript para `dist/`. |
 | `npm start` | Roda o bot compilado (`dist/index.js`). |
 | `npm run deploy` | Registra/atualiza os slash commands no servidor. Rode após adicionar ou alterar a definição de um comando. |
+| `npm run deploy:prod` | Igual ao `deploy`, mas roda o script compilado do `dist/` — para produção/VPS (rode `npm run build` antes). |
 | `npm run db:push` | Sincroniza o schema do Prisma com o banco SQLite. |
 | `npm run db:studio` | Abre o Prisma Studio para inspecionar o banco. |
 | `npm run typecheck` | Faz a checagem de tipos sem gerar arquivos. |
@@ -254,13 +272,13 @@ https://discord.com/oauth2/authorize?client_id=SEU_CLIENT_ID&scope=bot%20applica
 src/
 ├── core/            # client, config, logger, database (infra)
 ├── commands/        # slash commands agrupados por domínio
-│   ├── admin/       #   logs, automod, ticket, sorteio, enquete, instagram, painel, boasvindas, autorole, cargo, permissao
-│   ├── economy/     #   economia, perfil, saldo, ranking, pagar
+│   ├── admin/       #   logs, automod, links, gifs, trap, config(bump), ticket, parceria, sorteio, enquete, instagram, painel, dm, boasvindas, autorole, cargo, permissao
+│   ├── economy/     #   economia, loja, comprar, perfil, saldo, ranking, kuro, pagar
 │   ├── moderation/  #   ban, unban, kick, mute, unmute, warn, clear, grace
 │   └── utility/     #   embed, ping, serverinfo, userinfo, avatar
 ├── events/          # eventos do gateway (interactionCreate, guildMemberAdd, message*, eventos do log do servidor)
 ├── jobs/            # tarefas agendadas (penalidades de warn, sorteios, enquetes, drops de economia, limpeza de logs)
-├── services/        # regras de negócio (moderation, automod, log, instagram, economy, welcome, permission)
+├── services/        # regras de negócio (moderation, automod, log, instagram, economy, shop, welcome, partnership, bump, trap, permission)
 ├── repositories/    # acesso a dados via Prisma
 ├── interfaces/      # contratos (Command, Event, Component, Config)
 ├── utils/           # embeds, permissions, time, formatter, auditLog
@@ -270,7 +288,7 @@ src/
 ├── index.ts         # ponto de entrada
 └── deploy.ts        # script de registro dos slash commands
 prisma/
-└── schema.prisma    # todos os modelos (advertências, tickets, sorteios, enquetes, logs, instagram, economia, ...)
+└── schema.prisma    # todos os modelos (advertências, tickets, parcerias, sorteios, enquetes, logs, instagram, economia, loja, ...)
 ```
 
 **Como tudo se encaixa:** o `index.ts` chama o `app.ts`, que cria o client e roda os loaders. O `commandLoader` lê todos os arquivos sob `commands/`, registra cada comando e seus handlers de botão/modal (componentes). O `interactionCreate` roteia comandos slash pelo nome e interações de componentes pelo prefixo do customId (ex.: `embed:send` → o handler do componente `embed`). Tarefas em segundo plano (sorteios, enquetes, drops de economia, penalidades de warn) rodam em intervalos agendados a partir do evento `ready`.
