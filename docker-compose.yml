@@ -1,0 +1,17 @@
+# Sobe o bot Lambda como container, na mesma rede do Postgres do 1Panel.
+# As variáveis (token, DATABASE_URL, etc.) vêm de um arquivo .env ao lado deste compose.
+services:
+  lambda-bot:
+    build: .
+    container_name: lambda-bot
+    restart: unless-stopped
+    env_file:
+      - .env
+    networks:
+      - 1panel-network
+
+# Rede externa onde os apps do 1Panel (incluindo o Postgres) vivem.
+# Confira o nome real em Container → Redes; se for diferente, ajuste aqui.
+networks:
+  1panel-network:
+    external: true

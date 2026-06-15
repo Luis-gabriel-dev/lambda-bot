@@ -1,0 +1,19 @@
+# Nunca copiar dependências/build da máquina (o engine do Prisma é específico do SO).
+node_modules
+dist
+
+# Segredos e dados locais
+.env
+.env.*
+prisma/*.db
+prisma/*.db-journal
+*.db
+
+# Lixo de versionamento / logs / SO
+.git
+.gitignore
+logs
+*.log
+npm-debug.log*
+.DS_Store
+Thumbs.db
