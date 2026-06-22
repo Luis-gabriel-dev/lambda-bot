@@ -1,4 +1,5 @@
 import { requireGuildAdmin } from "@/lib/guards";
+import { getGuildOptions } from "@/lib/discord";
 import { prisma } from "@/lib/db";
 import { WelcomeForm } from "@/components/welcome-form";
 
@@ -8,7 +9,10 @@ export default async function WelcomePage({ params }: { params: Promise<{ guildI
   const { guildId } = await params;
   await requireGuildAdmin(guildId);
 
-  const config = await prisma.guildConfig.findUnique({ where: { guildId } });
+  const [config, options] = await Promise.all([
+    prisma.guildConfig.findUnique({ where: { guildId } }),
+    getGuildOptions(guildId),
+  ]);
   const colorHex =
     config?.welcomeColor != null ? `#${config.welcomeColor.toString(16).padStart(6, "0")}` : "";
 
@@ -22,6 +26,8 @@ export default async function WelcomePage({ params }: { params: Promise<{ guildI
       </div>
       <WelcomeForm
         guildId={guildId}
+        channels={options.channels}
+        roles={options.roles}
         initial={{
           welcomeChannelId: config?.welcomeChannelId ?? "",
           welcomeRulesChannelId: config?.welcomeRulesChannelId ?? "",

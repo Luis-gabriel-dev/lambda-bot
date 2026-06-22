@@ -3,6 +3,7 @@
 import { useActionState, useEffect, useRef } from "react";
 import { toast } from "sonner";
 import { saveWelcomeConfig, type ActionResult } from "@/actions/welcome";
+import type { Option } from "@/lib/discord";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -17,7 +18,42 @@ export interface WelcomeInitial {
   welcomeExtraText: string;
 }
 
-function Field({
+const controlClass =
+  "border-input bg-background text-foreground focus-visible:border-ring focus-visible:ring-ring/50 h-9 w-full rounded-lg border px-3 text-sm shadow-xs outline-none focus-visible:ring-3";
+
+function SelectField({
+  name,
+  label,
+  hint,
+  options,
+  defaultValue,
+  prefix,
+}: {
+  name: string;
+  label: string;
+  hint?: string;
+  options: Option[];
+  defaultValue: string;
+  prefix: string;
+}) {
+  return (
+    <div className="space-y-1.5">
+      <Label htmlFor={name}>{label}</Label>
+      <select id={name} name={name} defaultValue={defaultValue} className={controlClass}>
+        <option value="">— None —</option>
+        {options.map((o) => (
+          <option key={o.id} value={o.id}>
+            {prefix}
+            {o.name}
+          </option>
+        ))}
+      </select>
+      {hint ? <p className="text-muted-foreground text-xs">{hint}</p> : null}
+    </div>
+  );
+}
+
+function TextField({
   name,
   label,
   hint,
@@ -39,7 +75,17 @@ function Field({
   );
 }
 
-export function WelcomeForm({ guildId, initial }: { guildId: string; initial: WelcomeInitial }) {
+export function WelcomeForm({
+  guildId,
+  initial,
+  channels,
+  roles,
+}: {
+  guildId: string;
+  initial: WelcomeInitial;
+  channels: Option[];
+  roles: Option[];
+}) {
   const [state, formAction, pending] = useActionState<ActionResult | null, FormData>(saveWelcomeConfig, null);
   const lastShown = useRef<ActionResult | null>(null);
 
@@ -56,42 +102,46 @@ export function WelcomeForm({ guildId, initial }: { guildId: string; initial: We
       <input type="hidden" name="guildId" value={guildId} />
 
       <div className="grid gap-5 sm:grid-cols-2">
-        <Field
+        <SelectField
           name="welcomeChannelId"
-          label="Welcome channel ID"
-          hint="Where the welcome message is posted. Empty = disabled."
+          label="Welcome channel"
+          hint="Where the welcome message is posted. None = disabled."
+          options={channels}
           defaultValue={initial.welcomeChannelId}
-          placeholder="123456789012345678"
+          prefix="# "
         />
-        <Field
+        <SelectField
           name="welcomeRoleId"
-          label="Reception role ID"
+          label="Reception role"
           hint="Pinged next to the new member. Optional."
+          options={roles}
           defaultValue={initial.welcomeRoleId}
-          placeholder="123456789012345678"
+          prefix="@ "
         />
-        <Field
+        <SelectField
           name="welcomeRulesChannelId"
-          label="Rules channel ID"
+          label="Rules channel"
           hint="Cited in the welcome message. Optional."
+          options={channels}
           defaultValue={initial.welcomeRulesChannelId}
-          placeholder="123456789012345678"
+          prefix="# "
         />
-        <Field
+        <SelectField
           name="welcomeColorChannelId"
-          label="Color channel ID"
-          hint="Profile-color channel cited in the message. Optional."
+          label="Profile-color channel"
+          hint="Cited in the message. Optional."
+          options={channels}
           defaultValue={initial.welcomeColorChannelId}
-          placeholder="123456789012345678"
+          prefix="# "
         />
-        <Field
+        <TextField
           name="welcomeColor"
           label="Embed color"
           hint="#RRGGBB. Empty = the member's avatar color."
           defaultValue={initial.welcomeColor}
           placeholder="#5865F2"
         />
-        <Field
+        <TextField
           name="welcomeImageUrl"
           label="Image / GIF URL"
           hint="Shown in the embed. Optional."
