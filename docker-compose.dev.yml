@@ -1,0 +1,19 @@
+# Postgres LOCAL apenas para desenvolvimento (bot + site compartilham este banco).
+# NÃO é produção. Suba com:  docker compose -f docker-compose.dev.yml up -d
+services:
+  postgres-dev:
+    image: postgres:17
+    container_name: lambda-postgres-dev
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: lambda
+      POSTGRES_PASSWORD: lambda
+      POSTGRES_DB: lambda
+    # Host 5433 (não 5432) para não conflitar com outros Postgres locais (ex.: librarydb).
+    ports:
+      - '5433:5432'
+    volumes:
+      - lambda-pgdata:/var/lib/postgresql/data
+
+volumes:
+  lambda-pgdata:

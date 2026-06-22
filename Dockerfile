@@ -13,10 +13,8 @@ RUN npm ci
 # 2) Código do projeto (o .dockerignore mantém node_modules/.env de fora).
 COPY . .
 
-# 3) Em produção o bot usa PostgreSQL. No dev local o schema fica em SQLite;
-#    aqui trocamos o provider apenas dentro da imagem, sem afetar seu ambiente local.
-RUN sed -i 's/provider = "sqlite"/provider = "postgresql"/' prisma/schema.prisma \
-    && npx prisma generate
+# 3) Gera o Prisma Client (o schema já está em PostgreSQL).
+RUN npx prisma generate
 
 # 4) Compila o TypeScript para dist/.
 RUN npm run build

@@ -1,12 +1,12 @@
-// Prisma schema — SQLite por padrão, troque o provider para "postgresql" no futuro
-// sem reescrever as queries. Rode `npm run db:push` após alterar este arquivo.
+// Prisma schema — PostgreSQL (dev via docker-compose.dev.yml; prod na VPS).
+// Rode `npm run db:push` após alterar este arquivo.
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
