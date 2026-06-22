@@ -56,6 +56,12 @@ const command: Command = {
         .setDescription('Texto extra no fim da descrição (use \\n para pular linha; vazio remove).')
         .addStringOption((opt) => opt.setName('texto').setDescription('Texto a adicionar. Deixe vazio para remover.').setRequired(false))
     )
+    .addSubcommand((sub) =>
+      sub
+        .setName('recepcao')
+        .setDescription('Cargo marcado junto do novo membro nas boas-vindas (vazio remove).')
+        .addRoleOption((opt) => opt.setName('cargo').setDescription('Cargo de recepção a notificar.').setRequired(false))
+    )
     .addSubcommand((sub) => sub.setName('testar').setDescription('Mostra uma prévia das boas-vindas com o seu perfil.'))
     .addSubcommand((sub) => sub.setName('desativar').setDescription('Desativa as boas-vindas.'))
     .addSubcommand((sub) => sub.setName('status').setDescription('Mostra a configuração atual das boas-vindas.')),
@@ -158,6 +164,22 @@ const command: Command = {
       return;
     }
 
+    if (sub === 'recepcao') {
+      const cargo = interaction.options.getRole('cargo');
+      await guildConfigRepository.setWelcomeRole(guildId, cargo?.id ?? null);
+      await interaction.reply({
+        embeds: [
+          successEmbed(
+            cargo
+              ? `Vou marcar ${cargo} junto do novo membro nas boas-vindas (pra recepção saber que chegou gente).`
+              : 'Cargo de recepção removido das boas-vindas.'
+          )
+        ],
+        flags: MessageFlags.Ephemeral
+      });
+      return;
+    }
+
     if (sub === 'desativar') {
       await guildConfigRepository.setWelcomeChannel(guildId, null);
       await interaction.reply({ embeds: [successEmbed('Boas-vindas desativadas.')], flags: MessageFlags.Ephemeral });
@@ -176,10 +198,11 @@ const command: Command = {
           : '*automática (avatar → aleatória)*';
       const ativo = config?.welcomeChannelId ? '🟢 ativo' : '🔴 inativo (defina um canal)';
       const textoExtra = config?.welcomeExtraText ? '✅ definido' : '*nenhum*';
+      const recepcao = config?.welcomeRoleId ? `<@&${config.welcomeRoleId}>` : '*nenhum*';
       await interaction.reply({
         embeds: [
           infoEmbed(
-            `**Boas-vindas**\nStatus: ${ativo}\nCanal: ${canal}\nImagem: ${imagem}\nCanal de regras: ${regras}\nCanal de cor de perfil: ${corCanal}\nCor do embed: ${cor}\nTexto extra: ${textoExtra}`
+            `**Boas-vindas**\nStatus: ${ativo}\nCanal: ${canal}\nImagem: ${imagem}\nCanal de regras: ${regras}\nCanal de cor de perfil: ${corCanal}\nCor do embed: ${cor}\nTexto extra: ${textoExtra}\nCargo de recepção: ${recepcao}`
           )
         ],
         flags: MessageFlags.Ephemeral

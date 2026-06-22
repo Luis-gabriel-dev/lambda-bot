@@ -84,6 +84,15 @@ export const guildConfigRepository = {
     });
   },
 
+  /** Define (ou limpa) o cargo de recepção marcado junto do novo membro nas boas-vindas. */
+  async setWelcomeRole(guildId: string, roleId: string | null): Promise<void> {
+    await prisma.guildConfig.upsert({
+      where: { guildId },
+      create: { guildId, welcomeRoleId: roleId },
+      update: { welcomeRoleId: roleId }
+    });
+  },
+
   /** Define (ou limpa) o canal-armadilha (/trap). */
   async setTrapChannel(guildId: string, channelId: string | null): Promise<void> {
     await prisma.guildConfig.upsert({

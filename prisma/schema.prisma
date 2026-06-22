@@ -48,6 +48,7 @@ model GuildConfig {
   welcomeColorChannelId String? // canal de cor de perfil citado nas boas-vindas
   welcomeColor          Int? // cor fixa do embed (null = aleatória entre 40 cores)
   welcomeExtraText      String? // texto extra opcional anexado ao fim da descrição das boas-vindas
+  welcomeRoleId         String? // cargo de recepção marcado junto do novo membro nas boas-vindas
   trapChannelId         String? // canal-armadilha: quem mandar mensagem aqui leva kick
   dmImageUrl            String? // imagem padrão usada em todos os embeds de DM do bot
   bumpChannelId         String? // canal exclusivo de /bump (apaga o que não for /bump)

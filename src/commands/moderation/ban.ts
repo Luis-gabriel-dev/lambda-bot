@@ -14,7 +14,8 @@ const command: Command = {
   data: new SlashCommandBuilder()
     .setName('ban')
     .setDescription('Bane um usuário do servidor.')
-    .addUserOption((opt) => opt.setName('usuario').setDescription('Usuário a banir.').setRequired(true))
+    .addUserOption((opt) => opt.setName('usuario').setDescription('Usuário a banir.').setRequired(false))
+    .addStringOption((opt) => opt.setName('id').setDescription('ID do usuário a banir (funciona mesmo se já saiu do servidor).').setRequired(false))
     .addStringOption((opt) => opt.setName('motivo').setDescription('Motivo do banimento (obrigatório).').setRequired(false))
     .addIntegerOption((opt) =>
       opt
@@ -44,6 +45,22 @@ const command: Command = {
       return;
     }
 
+    // Alvo: por usuário (campo) OU por ID (texto). Pelo menos um é obrigatório.
+    const userOpt = interaction.options.getUser('usuario');
+    const idOpt = interaction.options.getString('id')?.trim();
+    if (!userOpt && !idOpt) {
+      await interaction.reply({
+        embeds: [errorEmbed('Informe o **usuário** ou o **id** de quem você quer banir.')],
+        flags: MessageFlags.Ephemeral
+      });
+      return;
+    }
+    if (!userOpt && idOpt && !/^\d{17,20}$/.test(idOpt)) {
+      await interaction.reply({ embeds: [errorEmbed('ID inválido. Informe o ID numérico do usuário.')], flags: MessageFlags.Ephemeral });
+      return;
+    }
+    const targetId = userOpt?.id ?? idOpt!;
+
     // Motivo obrigatório para todos, exceto o dono do bot.
     const reasonInput = interaction.options.getString('motivo');
     if (!isOwner(interaction.user.id) && !reasonInput?.trim()) {
@@ -54,10 +71,16 @@ const command: Command = {
       return;
     }
     const reason = reasonInput?.trim() || 'Sem motivo informado';
-    const user = interaction.options.getUser('usuario', true);
     const deleteDays = interaction.options.getInteger('apagar_dias') ?? 0;
 
-    const member = await interaction.guild.members.fetch(user.id).catch(() => null);
+    // Já está banido?
+    const existing = await interaction.guild.bans.fetch(targetId).catch(() => null);
+    if (existing) {
+      await interaction.reply({ embeds: [errorEmbed(`**${existing.user.tag}** já está banido.`)], flags: MessageFlags.Ephemeral });
+      return;
+    }
+
+    const member = await interaction.guild.members.fetch(targetId).catch(() => null);
     if (member) {
       const hierarchyError = checkHierarchy(interaction.member, member);
       if (hierarchyError) {
@@ -75,28 +98,35 @@ const command: Command = {
 
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
+    // Resolve o usuário (pode não estar mais no servidor — o ban por ID funciona mesmo assim).
+    const user = userOpt ?? (await interaction.client.users.fetch(targetId).catch(() => null));
+    const label = user?.tag ?? targetId;
+
     // Auditoria: arquiva as mensagens do usuário ANTES de banir (só se houver canal configurado).
     if (await isAuditEnabled(interaction.guildId)) {
-      const messages = await collectUserMessages(interaction.guild, user.id);
-      await archiveMessages(interaction.guild, `Ban de ${user.tag}`, reason, messages);
+      const messages = await collectUserMessages(interaction.guild, targetId);
+      await archiveMessages(interaction.guild, `Ban de ${label}`, reason, messages);
     }
 
-    const dm = buildPunishmentDM({
-      guildName: interaction.guild.name,
-      guildIcon: interaction.guild.iconURL({ size: 256 }),
-      action: 'banido',
-      color: Palette.error,
-      reason
-    });
-    await sendGuildDM(user, interaction.guildId, dm);
+    // DM só se conseguimos resolver o usuário.
+    if (user) {
+      const dm = buildPunishmentDM({
+        guildName: interaction.guild.name,
+        guildIcon: interaction.guild.iconURL({ size: 256 }),
+        action: 'banido',
+        color: Palette.error,
+        reason
+      });
+      await sendGuildDM(user, interaction.guildId, dm);
+    }
 
-    await interaction.guild.bans.create(user.id, {
+    await interaction.guild.bans.create(targetId, {
       reason: `${interaction.user.tag}: ${reason}`,
       deleteMessageSeconds: deleteDays * 86_400
     });
 
     await interaction.editReply({
-      embeds: [successEmbed(`🔨 **${user.tag}** foi banido.\nMotivo: ${reason}`)]
+      embeds: [successEmbed(`🔨 **${label}** foi banido.\nMotivo: ${reason}`)]
     });
   }
 };

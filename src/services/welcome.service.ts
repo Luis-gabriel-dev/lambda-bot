@@ -78,6 +78,8 @@ export interface WelcomeOptions {
   colorChannelId?: string | null;
   /** Texto extra opcional, anexado ao fim da descrição. */
   extraText?: string | null;
+  /** Cargo de recepção marcado junto do novo membro (no conteúdo da mensagem). */
+  receptionRoleId?: string | null;
   /** Cor já resolvida do embed; se ausente, sorteia uma das 40 cores. */
   color?: number;
 }
@@ -117,7 +119,9 @@ export function buildWelcome(member: GuildMember, opts: WelcomeOptions = {}): { 
 
   if (opts.imageUrl) embed.setImage(opts.imageUrl);
 
-  return { content: `${member}`, embed };
+  // Marca o membro e, se houver, o cargo de recepção ao lado dele.
+  const content = opts.receptionRoleId ? `${member} <@&${opts.receptionRoleId}>` : `${member}`;
+  return { content, embed };
 }
 
 /** Publica a mensagem de boas-vindas no canal configurado (ignora bots). */
@@ -136,9 +140,14 @@ export async function sendWelcome(member: GuildMember): Promise<void> {
     rulesChannelId: config.welcomeRulesChannelId,
     colorChannelId: config.welcomeColorChannelId,
     extraText: config.welcomeExtraText,
+    receptionRoleId: config.welcomeRoleId,
     color
   });
   await channel
-    .send({ content, embeds: [embed], allowedMentions: { users: [member.id] } })
+    .send({
+      content,
+      embeds: [embed],
+      allowedMentions: { users: [member.id], roles: config.welcomeRoleId ? [config.welcomeRoleId] : [] }
+    })
     .catch(() => undefined);
 }
