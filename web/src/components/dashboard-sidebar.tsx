@@ -8,9 +8,16 @@ const sections: { title: string; items: [string, string][] }[] = [
   { title: "Economy", items: [["economy", "Drops"], ["shop", "Role shop"]] },
   {
     title: "Moderation",
-    items: [["automod", "Automod"], ["gifs", "Anti-GIF"], ["trap", "Trap"], ["bump", "Bump"], ["permissions", "Permissions"]],
+    items: [
+      ["automod", "Automod"],
+      ["links", "Anti-link"],
+      ["gifs", "Anti-GIF"],
+      ["trap", "Trap"],
+      ["bump", "Bump"],
+      ["permissions", "Permissions"],
+    ],
   },
-  { title: "Community", items: [["tickets", "Tickets"], ["partnership", "Partnerships"]] },
+  { title: "Community", items: [["tickets", "Tickets"], ["partnership", "Partnerships"], ["instagram", "Instagram"]] },
   { title: "Server", items: [["logs", "Logs"]] },
 ];
 
