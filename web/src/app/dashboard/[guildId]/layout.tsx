@@ -1,4 +1,4 @@
-import { GuildTabs } from "@/components/guild-tabs";
+import { DashboardSidebar } from "@/components/dashboard-sidebar";
 
 export default async function GuildLayout({
   children,
@@ -9,9 +9,9 @@ export default async function GuildLayout({
 }) {
   const { guildId } = await params;
   return (
-    <div>
-      <GuildTabs guildId={guildId} />
-      {children}
+    <div className="flex flex-col gap-8 sm:flex-row">
+      <DashboardSidebar guildId={guildId} />
+      <div className="min-w-0 flex-1">{children}</div>
     </div>
   );
 }
