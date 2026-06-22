@@ -5,8 +5,9 @@ import { usePathname } from "next/navigation";
 
 const sections: { title: string; items: [string, string][] }[] = [
   { title: "General", items: [["welcome", "Welcome"], ["autorole", "Auto-roles"], ["dm", "Direct messages"]] },
-  { title: "Economy", items: [["economy", "Drops"]] },
-  { title: "Moderation", items: [["gifs", "Anti-GIF"], ["trap", "Trap"], ["bump", "Bump"]] },
+  { title: "Economy", items: [["economy", "Drops"], ["shop", "Role shop"]] },
+  { title: "Moderation", items: [["gifs", "Anti-GIF"], ["trap", "Trap"], ["bump", "Bump"], ["permissions", "Permissions"]] },
+  { title: "Community", items: [["tickets", "Tickets"]] },
   { title: "Server", items: [["logs", "Logs"]] },
 ];
 
