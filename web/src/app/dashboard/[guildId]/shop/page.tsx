@@ -34,7 +34,7 @@ export default async function ShopPage({ params }: { params: Promise<{ guildId: 
             <li key={r.id} className="flex items-center justify-between gap-4 py-3">
               <div className="min-w-0">
                 <p className="text-sm">
-                  @ {roleName(r.roleId)} — <strong>{r.price.toLocaleString("en-US")}</strong> kurocoins
+                  @ {roleName(r.roleId)} · <strong>{r.price.toLocaleString("en-US")}</strong> kurocoins
                 </p>
                 {r.description ? <p className="text-muted-foreground truncate text-xs">{r.description}</p> : null}
               </div>

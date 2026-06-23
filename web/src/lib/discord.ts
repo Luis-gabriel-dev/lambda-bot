@@ -92,7 +92,7 @@ async function botFetch<T>(path: string): Promise<T | null> {
   return (await res.json()) as T;
 }
 
-/** Canais (texto), categorias e cargos de um servidor — cacheado por 60s. */
+/** Canais (texto), categorias e cargos de um servidor (cacheado por 60s). */
 export async function getGuildOptions(guildId: string): Promise<{ channels: Option[]; categories: Option[]; roles: Option[] }> {
   const cached = optionCache.get(guildId);
   if (cached && Date.now() - cached.at < OPTIONS_TTL) return cached;

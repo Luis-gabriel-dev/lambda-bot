@@ -20,7 +20,7 @@ export default async function TrapPage({ params }: { params: Promise<{ guildId: 
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold">Trap</h1>
-        <p className="text-muted-foreground text-sm">A honeypot channel — anyone who posts there is kicked instantly.</p>
+        <p className="text-muted-foreground text-sm">A honeypot channel. Anyone who posts there is kicked instantly.</p>
       </div>
       <ChannelExemptForm
         guildId={guildId}

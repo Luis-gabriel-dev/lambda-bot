@@ -34,7 +34,9 @@ const command: Command = {
       return;
     }
 
-    const { reels, multiplier } = spinSlots();
+    // Quantas vezes a pessoa já jogou define a chance (alta no começo, despenca depois).
+    const playNumber = await economyRepository.bumpSlotsPlayed(interaction.guildId, interaction.user.id);
+    const { reels, multiplier } = spinSlots(playNumber - 1);
     const payout = Math.floor(aposta * multiplier);
 
     let finalBalance = balance;
@@ -44,25 +46,35 @@ const command: Command = {
     }
 
     const net = payout - aposta;
-    const won = net > 0;
-    const drew = payout > 0 && net <= 0; // recuperou parte (par com multiplicador baixo)
+    const won = payout > 0;
+
+    // GIF e auto-deleção configuráveis (/economia slotgif, /economia slotsautodeletar).
+    const [gifs, config] = await Promise.all([
+      economyRepository.listSlotGifs(interaction.guildId),
+      economyRepository.getConfig(interaction.guildId)
+    ]);
+    const gif = gifs.length > 0 ? gifs[Math.floor(Math.random() * gifs.length)]! : null;
 
     const embed = new EmbedBuilder()
-      .setColor(won ? 0x2ecc71 : drew ? 0xf1c40f : 0xe74c3c)
-      .setTitle('🎰 Caça-níquel')
+      .setColor(won ? 0x2ecc71 : 0xe74c3c)
+      .setTitle('Jogo de apostas do Kuro ⚫')
       .setDescription(
-        `## ▶️ ${reels.join('  ')} ◀️\n\n` +
-          (payout > 0
-            ? won
-              ? `🎉 Você **ganhou** ${n(net)} ${CURRENCY}! *(recebeu ${n(payout)} de uma aposta de ${n(aposta)})*`
-              : `😬 Quase! Você recuperou ${n(payout)} de ${n(aposta)} ${CURRENCY}.`
-            : `💸 Você **perdeu** ${n(aposta)} ${CURRENCY}. Mais sorte na próxima!`)
+        `## ${reels.join('  ')}\n\n` +
+          (won
+            ? `Você **ganhou** ${n(net)} ${CURRENCY} 🎉! *(recebeu ${n(payout)} de uma aposta de ${n(aposta)})*`
+            : `Você **perdeu** ${n(aposta)} ${CURRENCY}. Mais sorte na próxima! 💸`)
       )
-      .addFields({ name: '💰 Saldo', value: `**${n(finalBalance)}** ${CURRENCY}`, inline: true })
+      .addFields({ name: 'Saldo 💰', value: `**${n(finalBalance)}** ${CURRENCY}`, inline: true })
       .setFooter({ text: `Jogado por ${interaction.user.username}` })
       .setTimestamp();
+    if (gif) embed.setImage(gif);
 
     await interaction.reply({ embeds: [embed] });
+
+    // Apaga a mensagem depois do tempo configurado (se houver).
+    if (config?.slotsDeleteMs && config.slotsDeleteMs > 0) {
+      setTimeout(() => void interaction.deleteReply().catch(() => undefined), config.slotsDeleteMs);
+    }
   }
 };
 

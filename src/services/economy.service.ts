@@ -160,7 +160,9 @@ export async function postDrop(client: Client, config: EconomyConfig, fixedAmoun
 
 // ---- Ranking (Components V2: avatar por linha) ----
 
-const RANK_PAGE_SIZE = 8;
+// 6 por página: cada linha custa 4 componentes V2 (separador + seção c/ texto + avatar);
+// com o dono fixado (+4), cabeçalho e botões, o total fica < 40 (limite do Discord).
+const RANK_PAGE_SIZE = 6;
 const DEFAULT_AVATAR = 'https://cdn.discordapp.com/embed/avatars/0.png';
 
 /** Monta o container do ranking para uma página. Retorna null se ninguém tem saldo. */

@@ -53,7 +53,7 @@ export function ChannelExemptForm({
       <div className="space-y-1.5">
         <Label htmlFor="channel">{channelLabel}</Label>
         <select id="channel" name="channel" defaultValue={currentChannel} className={controlClass}>
-          <option value="">— None —</option>
+          <option value="">None</option>
           {channels.map((c) => (
             <option key={c.id} value={c.id}># {c.name}</option>
           ))}

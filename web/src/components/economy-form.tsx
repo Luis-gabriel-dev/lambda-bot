@@ -69,7 +69,7 @@ export function EconomyForm({
       <div className="space-y-1.5">
         <Label htmlFor="dropChannelId">Drop channel</Label>
         <select id="dropChannelId" name="dropChannelId" defaultValue={initial.dropChannelId} className={controlClass}>
-          <option value="">— None (drops disabled) —</option>
+          <option value="">None (drops disabled)</option>
           {channels.map((c) => (
             <option key={c.id} value={c.id}># {c.name}</option>
           ))}

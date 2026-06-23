@@ -80,5 +80,5 @@ export async function saveWelcomeConfig(_prev: ActionResult | null, formData: Fo
   });
 
   revalidatePath(`/dashboard/${guildId}/welcome`);
-  return { ok: true, message: "Saved — the bot uses it immediately." };
+  return { ok: true, message: "Saved. The bot uses it immediately." };
 }

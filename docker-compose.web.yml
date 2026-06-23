@@ -1,0 +1,20 @@
+# Sobe o SITE (dashboard) como container, na mesma rede do Postgres.
+# As variáveis vêm de um .env.web ao lado deste arquivo.
+services:
+  lambda-web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    container_name: lambda-web
+    restart: unless-stopped
+    env_file:
+      - .env.web
+    # Só o reverse proxy do 1Panel (local) acessa; não expõe na internet direto.
+    ports:
+      - "127.0.0.1:3000:3000"
+    networks:
+      - icontainer-network
+
+networks:
+  icontainer-network:
+    external: true

@@ -1,10 +1,15 @@
 # Nunca copiar dependências/build da máquina (o engine do Prisma é específico do SO).
 node_modules
+**/node_modules
 dist
+**/.next
+web/prisma/schema.prisma
 
 # Segredos e dados locais
 .env
 .env.*
+**/.env
+**/.env.*
 prisma/*.db
 prisma/*.db-journal
 *.db

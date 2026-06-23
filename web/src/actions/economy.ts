@@ -51,5 +51,5 @@ export async function saveEconomyConfig(_prev: ActionResult | null, formData: Fo
   });
 
   revalidatePath(`/dashboard/${guildId}/economy`);
-  return { ok: true, message: "Saved — drops use it on the next cycle." };
+  return { ok: true, message: "Saved. Drops use it on the next cycle." };
 }

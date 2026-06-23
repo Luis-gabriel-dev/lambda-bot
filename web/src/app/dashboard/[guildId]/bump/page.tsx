@@ -20,7 +20,7 @@ export default async function BumpPage({ params }: { params: Promise<{ guildId: 
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold">Bump</h1>
-        <p className="text-muted-foreground text-sm">A channel where only <code>/bump</code> is allowed — anything else is deleted.</p>
+        <p className="text-muted-foreground text-sm">A channel where only <code>/bump</code> is allowed. Anything else is deleted.</p>
       </div>
       <ChannelExemptForm
         guildId={guildId}

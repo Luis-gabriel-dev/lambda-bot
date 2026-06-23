@@ -40,7 +40,7 @@ export function LogsForm({
           <div key={t.key} className="space-y-1.5">
             <Label htmlFor={`log_${t.key}`}>{t.label}</Label>
             <select id={`log_${t.key}`} name={`log_${t.key}`} defaultValue={initial[t.key] ?? ""} className={controlClass}>
-              <option value="">— Off —</option>
+              <option value="">Off</option>
               {channels.map((c) => (
                 <option key={c.id} value={c.id}># {c.name}</option>
               ))}

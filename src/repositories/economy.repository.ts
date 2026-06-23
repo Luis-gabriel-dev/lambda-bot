@@ -71,6 +71,40 @@ export const economyRepository = {
     return rows.map((r) => r.url);
   },
 
+  // ---- GIFs da caça-níquel (/slots) ----
+  async addSlotGif(guildId: string, url: string): Promise<void> {
+    await prisma.slotGif.create({ data: { guildId, url } });
+  },
+
+  async removeSlotGif(guildId: string, url: string): Promise<boolean> {
+    const result = await prisma.slotGif.deleteMany({ where: { guildId, url } });
+    return result.count > 0;
+  },
+
+  async listSlotGifs(guildId: string): Promise<string[]> {
+    const rows = await prisma.slotGif.findMany({ where: { guildId }, select: { url: true } });
+    return rows.map((r) => r.url);
+  },
+
+  /** Soma +1 às jogadas de /slots do membro e devolve o total (define a chance de vitória). */
+  async bumpSlotsPlayed(guildId: string, userId: string): Promise<number> {
+    const wallet = await prisma.wallet.upsert({
+      where: { guildId_userId: { guildId, userId } },
+      create: { guildId, userId, slotsPlayed: 1 },
+      update: { slotsPlayed: { increment: 1 } }
+    });
+    return wallet.slotsPlayed;
+  },
+
+  /** Define (ou limpa) o tempo de auto-deleção da mensagem da caça-níquel. */
+  async setSlotsDelete(guildId: string, ms: number | null): Promise<void> {
+    await prisma.economyConfig.upsert({
+      where: { guildId },
+      create: { guildId, slotsDeleteMs: ms },
+      update: { slotsDeleteMs: ms }
+    });
+  },
+
   // ---- Carteira ----
   async getWallet(guildId: string, userId: string): Promise<Wallet | null> {
     return prisma.wallet.findUnique({ where: { guildId_userId: { guildId, userId } } });

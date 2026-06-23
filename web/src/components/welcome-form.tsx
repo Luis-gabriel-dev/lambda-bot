@@ -40,7 +40,7 @@ function SelectField({
     <div className="space-y-1.5">
       <Label htmlFor={name}>{label}</Label>
       <select id={name} name={name} defaultValue={defaultValue} className={controlClass}>
-        <option value="">— None —</option>
+        <option value="">None</option>
         {options.map((o) => (
           <option key={o.id} value={o.id}>
             {prefix}

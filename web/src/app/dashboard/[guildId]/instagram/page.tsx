@@ -22,7 +22,7 @@ export default async function InstagramPage({ params }: { params: Promise<{ guil
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold">Instagram</h1>
-        <p className="text-muted-foreground text-sm">Photo/video feed channels — each upload becomes a likeable post.</p>
+        <p className="text-muted-foreground text-sm">Photo/video feed channels. Each upload becomes a likeable post.</p>
       </div>
 
       <InstaAddForm guildId={guildId} channels={options.channels} />

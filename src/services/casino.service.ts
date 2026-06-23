@@ -1,55 +1,66 @@
 /**
- * Lógica dos jogos de aposta (kurocoins). Sem estado/banco aqui — só o "motor"
- * dos jogos; o dinheiro é tratado nos comandos via economyRepository.
+ * Caça-níquel "viciante": a chance de vitória é ALTA no começo e DESPENCA depois
+ * de ~8 jogadas (a contagem por jogador fica no banco — Wallet.slotsPlayed).
+ * Assim a pessoa ganha cedo (fisga) e vira sumidouro depois. Números fáceis de ajustar aqui.
  */
 
-// Símbolos da caça-níquel: maior weight = mais comum; payout = multiplicador da TRINCA (3 iguais).
-// Números calibrados pra casa levar uma leve vantagem — fáceis de ajustar aqui.
-export interface SlotSymbol {
-  emoji: string;
-  weight: number;
-  payout: number;
+const SYMBOLS = ['🍒', '🍋', '🔔', '⭐', '💎', '7️⃣'];
+
+function randomSymbol(): string {
+  return SYMBOLS[Math.floor(Math.random() * SYMBOLS.length)]!;
 }
 
-export const SLOT_SYMBOLS: SlotSymbol[] = [
-  { emoji: '🍒', weight: 30, payout: 5 },
-  { emoji: '🍋', weight: 25, payout: 8 },
-  { emoji: '🔔', weight: 20, payout: 12 },
-  { emoji: '⭐', weight: 13, payout: 20 },
-  { emoji: '💎', weight: 8, payout: 40 },
-  { emoji: '7️⃣', weight: 4, payout: 100 }
-];
+/**
+ * Chance de vitória conforme quantas vezes a pessoa JÁ jogou antes desta.
+ * Começo: ~70% caindo até ~45% nas primeiras 8 jogadas. Depois: 1% a 10% (raro).
+ */
+export function slotsWinChance(playsBefore: number): number {
+  if (playsBefore < 8) return Math.max(0.45, 0.7 - playsBefore * 0.035);
+  return 0.01 + Math.random() * 0.09;
+}
 
-/** Multiplicador quando saem exatamente DOIS iguais (consolação). */
-export const SLOT_PAIR_MULTIPLIER = 1.2;
-
-function pickSymbol(): SlotSymbol {
-  const total = SLOT_SYMBOLS.reduce((sum, s) => sum + s.weight, 0);
-  let r = Math.random() * total;
-  for (const sym of SLOT_SYMBOLS) {
-    r -= sym.weight;
-    if (r < 0) return sym;
-  }
-  return SLOT_SYMBOLS[0]!;
+/** Multiplicador de uma vitória — na maioria pequeno, raramente alto. */
+function winMultiplier(): number {
+  const r = Math.random();
+  if (r < 0.7) return 1.5;
+  if (r < 0.92) return 2.5;
+  if (r < 0.98) return 5;
+  return 12;
 }
 
 export interface SlotResult {
   reels: [string, string, string];
-  /** Multiplicador da aposta (0 = perdeu, ex.: 1.2 par, 5+ trinca). */
+  /** Multiplicador da aposta (0 = perdeu). */
   multiplier: number;
 }
 
-/** Gira a caça-níquel e devolve os 3 símbolos + o multiplicador da aposta. */
-export function spinSlots(): SlotResult {
-  const picks = [pickSymbol(), pickSymbol(), pickSymbol()];
-  const [a, b, c] = picks.map((p) => p.emoji) as [string, string, string];
+/** Gira a caça-níquel. A vitória é decidida pela chance (que cai com o tempo). */
+export function spinSlots(playsBefore: number): SlotResult {
+  const win = Math.random() < slotsWinChance(playsBefore);
 
-  let multiplier = 0;
-  if (a === b && b === c) {
-    multiplier = picks[0]!.payout; // trinca
-  } else if (a === b || b === c || a === c) {
-    multiplier = SLOT_PAIR_MULTIPLIER; // par
+  if (!win) {
+    // Três símbolos diferentes (derrota visível).
+    const a = randomSymbol();
+    let b = randomSymbol();
+    while (b === a) b = randomSymbol();
+    let c = randomSymbol();
+    while (c === a || c === b) c = randomSymbol();
+    return { reels: [a, b, c], multiplier: 0 };
   }
 
-  return { reels: [a, b, c], multiplier };
+  const multiplier = winMultiplier();
+
+  if (multiplier <= 1.5) {
+    // Par (dois iguais) — vitória pequena.
+    const s = randomSymbol();
+    let o = randomSymbol();
+    while (o === s) o = randomSymbol();
+    const i = Math.floor(Math.random() * 3); // posição aleatória do símbolo diferente
+    const reels: [string, string, string] = [i === 0 ? o : s, i === 1 ? o : s, i === 2 ? o : s];
+    return { reels, multiplier };
+  }
+
+  // Trinca — vitória maior.
+  const s = randomSymbol();
+  return { reels: [s, s, s], multiplier };
 }

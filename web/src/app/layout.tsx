@@ -16,11 +16,11 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   metadataBase: new URL("https://lambda.adastratech.dev"),
   title: {
-    default: "Lambda — All-in-one Discord Bot",
-    template: "%s — Lambda",
+    default: "Lambda - All-in-one Discord Bot",
+    template: "%s - Lambda",
   },
   description:
-    "Lambda is a powerful all-in-one Discord bot: moderation, automod, a kurocoins economy with a casino, tickets, server partnerships, a mini-Instagram, giveaways and welcome messages — all managed from a clean web dashboard.",
+    "Lambda is a powerful all-in-one Discord bot: moderation, automod, a kurocoins economy with a casino, tickets, server partnerships, a mini-Instagram, giveaways and welcome messages. Everything managed from a clean web dashboard.",
   keywords: [
     "discord bot",
     "discord moderation bot",
@@ -30,9 +30,9 @@ export const metadata: Metadata = {
     "discord dashboard",
   ],
   openGraph: {
-    title: "Lambda — All-in-one Discord Bot",
+    title: "Lambda - All-in-one Discord Bot",
     description:
-      "Moderation, economy, casino, tickets, partnerships and more — configured from a clean web dashboard.",
+      "Moderation, economy, casino, tickets, partnerships and more. Configured from a clean web dashboard.",
     type: "website",
     url: "https://lambda.adastratech.dev",
     siteName: "Lambda",

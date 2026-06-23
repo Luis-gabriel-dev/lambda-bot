@@ -333,11 +333,19 @@ model EconomyConfig {
   dropMax             Int       @default(500)
   expireDeleteMs      Int? // apagar a mensagem de "ninguém coletou" após N ms (null = nunca)
   claimedDeleteMs     Int? // apagar a mensagem de "coletado por X" após N ms (null = nunca)
+  slotsDeleteMs       Int? // apagar a mensagem da caça-níquel após N ms (null = nunca)
   lastDropAt          DateTime?
 }
 
 /// GIFs usados nos drops de dinheiro.
 model EconomyGif {
+  id      Int    @id @default(autoincrement())
+  guildId String
+  url     String
+}
+
+/// GIFs exibidos no embed da caça-níquel (/slots).
+model SlotGif {
   id      Int    @id @default(autoincrement())
   guildId String
   url     String
@@ -351,6 +359,7 @@ model Wallet {
   balance        Int      @default(0)
   totalCollected Int      @default(0)
   collectCount   Int      @default(0)
+  slotsPlayed    Int      @default(0) // quantas vezes jogou /slots (chance de vitória cai com o tempo)
   createdAt      DateTime @default(now())
 
   @@unique([guildId, userId])

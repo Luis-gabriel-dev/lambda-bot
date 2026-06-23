@@ -23,7 +23,7 @@ const features = [
   {
     icon: MessageSquareWarning,
     title: "Automod",
-    desc: "Anti-spam, links, invites, mass-mention, GIF and raid protection — with exempt roles.",
+    desc: "Anti-spam, links, invites, mass-mention, GIF and raid protection, with exempt roles.",
   },
   {
     icon: Coins,
@@ -89,7 +89,7 @@ export default function Home() {
             </h1>
             <p className="text-muted-foreground mx-auto mt-6 max-w-2xl text-lg text-pretty">
               Moderation, automod, a kurocoins economy with a casino, tickets, partnerships, a
-              mini-Instagram and more — all managed from one clean dashboard.
+              mini-Instagram and more. All managed from one clean dashboard.
             </p>
             <div className="mt-8 flex items-center justify-center gap-3">
               <Link href="/dashboard" className={buttonVariants({ size: "lg" })}>
@@ -120,7 +120,7 @@ export default function Home() {
 
       <footer className="border-border/40 border-t">
         <div className="text-muted-foreground mx-auto flex max-w-6xl flex-col items-center justify-between gap-2 px-6 py-6 text-sm sm:flex-row">
-          <span>Lambda — built with care by Kuro ❤️</span>
+          <span>Lambda · built with care by Kuro ❤️</span>
           <a href="https://adastratech.dev" className="hover:text-foreground transition-colors">
             adastratech.dev
           </a>

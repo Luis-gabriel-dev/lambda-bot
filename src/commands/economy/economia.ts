@@ -85,6 +85,29 @@ const command: Command = {
     )
     .addSubcommand((sub) =>
       sub
+        .setName('slotgif')
+        .setDescription('Gerencia os GIFs exibidos no embed da caça-níquel (/slots).')
+        .addStringOption((opt) =>
+          opt
+            .setName('acao')
+            .setDescription('O que fazer.')
+            .setRequired(true)
+            .addChoices(
+              { name: 'adicionar', value: 'adicionar' },
+              { name: 'remover', value: 'remover' },
+              { name: 'listar', value: 'listar' }
+            )
+        )
+        .addStringOption((opt) => opt.setName('url').setDescription('URL do GIF (para adicionar/remover).').setRequired(false))
+    )
+    .addSubcommand((sub) =>
+      sub
+        .setName('slotsautodeletar')
+        .setDescription('Apaga a mensagem da caça-níquel após um tempo (use 0m para desativar).')
+        .addStringOption((opt) => opt.setName('tempo').setDescription('Ex.: 15s, 1m. Use 0m para desativar.').setRequired(true))
+    )
+    .addSubcommand((sub) =>
+      sub
         .setName('dar')
         .setDescription('Dá kurocoins direto para um membro.')
         .addUserOption((opt) => opt.setName('usuario').setDescription('Quem recebe.').setRequired(true))
@@ -234,6 +257,62 @@ const command: Command = {
             value
               ? `A mensagem de "${rotulo}" será apagada após **${formatDuration(value)}**.`
               : `Auto-deleção da mensagem de "${rotulo}" **desativada**.`
+          )
+        ],
+        flags: MessageFlags.Ephemeral
+      });
+      return;
+    }
+
+    if (sub === 'slotgif') {
+      const acao = interaction.options.getString('acao', true);
+
+      if (acao === 'listar') {
+        const gifs = await economyRepository.listSlotGifs(guildId);
+        const value = gifs.length > 0 ? gifs.map((url, i) => `**${i + 1}.** ${url}`).join('\n') : '*nenhum GIF cadastrado*';
+        await interaction.reply({ embeds: [infoEmbed(`**GIFs da caça-níquel:**\n${value}`)], flags: MessageFlags.Ephemeral });
+        return;
+      }
+
+      const url = interaction.options.getString('url');
+      if (!url) {
+        await interaction.reply({ embeds: [errorEmbed('Informe a `url` do GIF para essa ação.')], flags: MessageFlags.Ephemeral });
+        return;
+      }
+
+      if (acao === 'adicionar') {
+        const tmp = new EmbedBuilder();
+        if (!applyUrl((u) => tmp.setImage(u), url)) {
+          await interaction.reply({ embeds: [errorEmbed('URL inválida.')], flags: MessageFlags.Ephemeral });
+          return;
+        }
+        await economyRepository.addSlotGif(guildId, url.trim());
+        await interaction.reply({ embeds: [successEmbed('GIF adicionado à caça-níquel.')], flags: MessageFlags.Ephemeral });
+        return;
+      }
+
+      const removed = await economyRepository.removeSlotGif(guildId, url.trim());
+      await interaction.reply({
+        embeds: [removed ? successEmbed('GIF removido.') : errorEmbed('Esse GIF não estava na lista.')],
+        flags: MessageFlags.Ephemeral
+      });
+      return;
+    }
+
+    if (sub === 'slotsautodeletar') {
+      const ms = parseDuration(interaction.options.getString('tempo', true));
+      if (ms === null) {
+        await interaction.reply({ embeds: [errorEmbed('Tempo inválido. Use formatos como `15s`, `1m` ou `0m` para desativar.')], flags: MessageFlags.Ephemeral });
+        return;
+      }
+      const value = ms > 0 ? ms : null;
+      await economyRepository.setSlotsDelete(guildId, value);
+      await interaction.reply({
+        embeds: [
+          successEmbed(
+            value
+              ? `A mensagem da caça-níquel será apagada após **${formatDuration(value)}**.`
+              : 'Auto-deleção da mensagem da caça-níquel **desativada**.'
           )
         ],
         flags: MessageFlags.Ephemeral

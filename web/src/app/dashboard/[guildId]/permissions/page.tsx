@@ -27,7 +27,7 @@ export default async function PermissionsPage({ params }: { params: Promise<{ gu
       <PermissionAddForm guildId={guildId} roles={options.roles} />
 
       {perms.length === 0 ? (
-        <p className="text-muted-foreground text-sm">No permissions configured — only the bot owner can use restricted commands.</p>
+        <p className="text-muted-foreground text-sm">No permissions configured. Only the bot owner can use restricted commands.</p>
       ) : (
         <ul className="divide-border/60 divide-y">
           {perms.map((p) => (

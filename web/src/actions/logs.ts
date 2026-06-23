@@ -34,5 +34,5 @@ export async function saveLogsConfig(_prev: ActionResult | null, formData: FormD
   );
 
   revalidatePath(`/dashboard/${guildId}/logs`);
-  return { ok: true, message: "Saved — logging updated." };
+  return { ok: true, message: "Saved. Logging updated." };
 }

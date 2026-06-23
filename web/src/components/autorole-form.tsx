@@ -16,7 +16,7 @@ function RoleSelect({ name, label, hint, roles, defaultValue }: { name: string; 
     <div className="space-y-1.5">
       <Label htmlFor={name}>{label}</Label>
       <select id={name} name={name} defaultValue={defaultValue} className={controlClass}>
-        <option value="">— None —</option>
+        <option value="">None</option>
         {roles.map((r) => (
           <option key={r.id} value={r.id}>@ {r.name}</option>
         ))}

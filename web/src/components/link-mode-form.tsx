@@ -28,8 +28,8 @@ export function LinkModeForm({ guildId, current }: { guildId: string; current: s
       <div className="flex-1 space-y-1.5">
         <Label htmlFor="mode">Mode</Label>
         <select id="mode" name="mode" defaultValue={current} className={controlClass}>
-          <option value="whitelist">Whitelist — block all links, allow the list</option>
-          <option value="blacklist">Blacklist — allow all links, block the list</option>
+          <option value="whitelist">Whitelist · block all links, allow the list</option>
+          <option value="blacklist">Blacklist · allow all links, block the list</option>
         </select>
       </div>
       <Button type="submit" disabled={pending}>
