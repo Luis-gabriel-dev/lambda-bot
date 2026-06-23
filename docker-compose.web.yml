@@ -1,5 +1,6 @@
 # Sobe o SITE (dashboard) como container, na mesma rede do Postgres.
 # As variáveis vêm de um .env.web ao lado deste arquivo.
+name: lambda-web
 services:
   lambda-web:
     build:
@@ -10,8 +11,9 @@ services:
     env_file:
       - .env.web
     # Só o reverse proxy do 1Panel (local) acessa; não expõe na internet direto.
+    # Porta 3100 no host (3000 e 3001 já são usadas pelos apps Ad Astra na VPS).
     ports:
-      - "127.0.0.1:3000:3000"
+      - "127.0.0.1:3100:3000"
     networks:
       - icontainer-network
 
