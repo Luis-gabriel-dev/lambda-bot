@@ -2,7 +2,7 @@
 
 🌐 **[English](#english) · [Português](#português)**
 
-A feature-rich Discord bot built with **TypeScript** and **discord.js v14**: moderation with warn escalation, automod, tickets, server **partnerships**, giveaways, polls, configurable logging, a mini-Instagram (photos & videos), a **kurocoins** economy with a **role shop**, and welcome messages — all on a scalable, layered architecture (commands, events, services, repositories, jobs, loaders) backed by **Prisma + SQLite**.
+A feature-rich Discord bot built with **TypeScript** and **discord.js v14**: moderation with warn escalation, automod, tickets, server **partnerships**, giveaways, polls, configurable logging, a mini-Instagram (photos & videos), a **kurocoins** economy with a **role shop**, and welcome messages — all on a scalable, layered architecture (commands, events, services, repositories, jobs, loaders) backed by **Prisma + PostgreSQL**. It also ships with a **Next.js web dashboard** ([lambda.adastratech.dev](https://lambda.adastratech.dev)) for configuring every system from the browser.
 
 ---
 
@@ -45,6 +45,7 @@ All **admin** commands require the *Administrator* permission; **moderation** co
 
 **Economy — kurocoins** (`/economia`)
 - Timed money drops in a channel with a **Coletar** button (first click wins); high values are rarer; random GIFs; configurable interval/min-max and auto-delete of drop messages.
+- **Casino & games** — **`/slots`** (a slot machine with a deliberately *progressive* win rate: generous for the first few spins, then house-favored; set a GIF and an auto-delete timer with `/economia slotgif` / `/economia slotsautodeletar`) and **`/duelo`** (a 50/50 PvP bet — both players ante the same amount, a coin flip decides, the winner takes the whole pot).
 - **`/perfil`**, **`/saldo`**, **`/ranking`** (paginated, one avatar per row) and **`/pagar`** (member-to-member transfer).
 - **Role shop** — `/economia cargo` sets which roles are buyable and their price; members browse with **`/loja`** (panel with balance + a buy menu) or buy directly with **`/comprar`**. Purchases debit atomically and **refund** if the role can't be assigned.
 - **Mystery** — the bot owner is always pinned at the top of `/ranking` with balance/collects masked as `???`/`?` (also masked in `/saldo` and `/perfil`); **`/kuro`** privately reveals the real numbers.
@@ -54,9 +55,12 @@ All **admin** commands require the *Administrator* permission; **moderation** co
 
 **Onboarding & roles** — **`/autorole`** (auto role on join), **`/cargo`** (role panels with buttons or a select menu, up to **10 roles**), **`/permissao`** (authorize roles for restricted commands), **`/dm`** (standardize a fixed banner image across every DM the bot sends).
 
+**Web dashboard** — a **Next.js** app (in `web/`) that mirrors the bot's configuration in the browser: log in with Discord, pick a server you administer where the bot is present, and configure Welcome, Auto-roles, DMs, Economy drops, Role shop, Automod, Anti-link, Anti-GIF, Trap, Bump, Permissions, Tickets, Partnerships, Instagram and Logs. Reads run in Server Components and writes go through authenticated Server Actions — every page and action re-checks admin rights server-side, and the bot reads config live, so changes apply instantly. Live at **[lambda.adastratech.dev](https://lambda.adastratech.dev)**.
+
 ### Requirements
 
 - [Node.js](https://nodejs.org/) 18 or higher (tested on 22)
+- **PostgreSQL** — local dev uses a throwaway instance via Docker (`docker-compose.dev.yml`); see *Setup*
 - A bot application in the [Discord Developer Portal](https://discord.com/developers/applications)
 
 ### Setup
@@ -67,13 +71,16 @@ npm install
 
 # 2. Create the .env (see below)
 
-# 3. Create the SQLite database from the Prisma schema
+# 3. Start a local PostgreSQL for dev (Docker)
+docker compose -f docker-compose.dev.yml up -d
+
+# 4. Sync the Prisma schema to the database
 npm run db:push
 
-# 4. Register the slash commands on your server
+# 5. Register the slash commands on your server
 npm run deploy
 
-# 5. Run the bot (dev mode, auto-reload)
+# 6. Run the bot (dev mode, auto-reload)
 npm run dev
 ```
 
@@ -86,14 +93,14 @@ DISCORD_TOKEN=your_bot_token
 CLIENT_ID=application_id
 GUILD_ID=server_id
 OWNER_ID=your_user_id
-DATABASE_URL="file:./dev.db"
+DATABASE_URL="postgresql://lambda:lambda@localhost:5433/lambda?schema=public"
 ```
 
 - **DISCORD_TOKEN** — bot token (Developer Portal → your app → *Bot* → *Reset Token*).
 - **CLIENT_ID** — *Application ID* (Developer Portal → *General Information*).
 - **GUILD_ID** — server ID where commands are registered. Enable *Developer Mode* (Settings → Advanced), right-click the server → *Copy Server ID*.
 - **OWNER_ID** — your Discord user ID (the bot owner). Bypasses every permission check and unlocks owner-only features like `/kuro`. Right-click your name → *Copy User ID*.
-- **DATABASE_URL** — SQLite file used by Prisma (default is fine).
+- **DATABASE_URL** — PostgreSQL connection string. The bundled `docker-compose.dev.yml` exposes Postgres on port **5433** (user/password/database all `lambda`), which the default above points to.
 
 > The `.env` is in `.gitignore` and must **never** be committed or shared — it contains the bot token.
 
@@ -114,7 +121,7 @@ https://discord.com/oauth2/authorize?client_id=YOUR_CLIENT_ID&scope=bot%20applic
 | `npm start` | Runs the compiled bot (`dist/index.js`). |
 | `npm run deploy` | Registers/updates the slash commands on the server. Run after adding or changing a command's definition. |
 | `npm run deploy:prod` | Same as `deploy`, but runs the compiled script from `dist/` — for production/VPS (run `npm run build` first). |
-| `npm run db:push` | Syncs the Prisma schema to the SQLite database. |
+| `npm run db:push` | Syncs the Prisma schema to the database (PostgreSQL). |
 | `npm run db:studio` | Opens Prisma Studio to inspect the database. |
 | `npm run typecheck` | Type-checks without emitting files. |
 
@@ -141,6 +148,8 @@ src/
 └── deploy.ts        # slash-command registration script
 prisma/
 └── schema.prisma    # all data models (warnings, tickets, partnerships, giveaways, polls, logs, instagram, economy, shop, ...)
+web/
+└── src/             # Next.js web dashboard (App Router, Auth.js + Discord OAuth, shared Prisma schema)
 ```
 
 **How it fits together:** `index.ts` calls `app.ts`, which creates the client and runs the loaders. `commandLoader` reads every file under `commands/`, registers each command and its button/modal handlers (components). `interactionCreate` routes slash commands by name and component interactions by the customId prefix (e.g. `embed:send` → the `embed` component handler). Background work (giveaways, polls, economy drops, warn penalties) runs on intervals scheduled from the `ready` event.
@@ -193,6 +202,7 @@ Todos os comandos de **admin** exigem a permissão *Administrador*; os de **mode
 
 **Economia — kurocoins** (`/economia`)
 - Drops de dinheiro num canal com botão **Coletar** (primeiro a clicar leva); valores altos mais raros; GIFs aleatórios; intervalo/mín-máx configuráveis e auto-deleção das mensagens de drop.
+- **Cassino & jogos** — **`/slots`** (caça-níquel com chance de vitória *progressiva* de propósito: generosa nas primeiras rodadas e depois favorável à casa; defina um GIF e um tempo de auto-deleção com `/economia slotgif` / `/economia slotsautodeletar`) e **`/duelo`** (aposta PvP 50/50 — os dois apostam o mesmo valor, um cara-ou-coroa decide e o vencedor leva o pote inteiro).
 - **`/perfil`**, **`/saldo`**, **`/ranking`** (paginado, um avatar por linha) e **`/pagar`** (transferência entre membros).
 - **Loja de cargos** — `/economia cargo` define quais cargos são compráveis e o preço; os membros veem com **`/loja`** (painel com saldo + menu de compra) ou compram direto com **`/comprar`**. A compra debita de forma atômica e **estorna** se o cargo não puder ser entregue.
 - **Mistério** — o dono do bot fica sempre fixado no topo do `/ranking` com saldo/coletas mascarados como `???`/`?` (também mascarados em `/saldo` e `/perfil`); **`/kuro`** revela os números reais só pra ele.
@@ -202,9 +212,12 @@ Todos os comandos de **admin** exigem a permissão *Administrador*; os de **mode
 
 **Entrada & cargos** — **`/autorole`** (cargo automático ao entrar), **`/cargo`** (painéis de cargo com botões ou menu de seleção, até **10 cargos**), **`/permissao`** (autoriza cargos nos comandos restritos), **`/dm`** (padroniza uma imagem fixa em todas as DMs que o bot envia).
 
+**Dashboard web** — um app **Next.js** (em `web/`) que espelha a configuração do bot no navegador: faça login com o Discord, escolha um servidor que você administra e onde o bot está, e configure Boas-vindas, Auto-cargos, DMs, Drops de economia, Loja de cargos, Automod, Anti-link, Anti-GIF, Trap, Bump, Permissões, Tickets, Parcerias, Instagram e Logs. As leituras rodam em Server Components e as escritas passam por Server Actions autenticadas — toda página e ação revalida o admin no servidor, e o bot lê a config ao vivo, então as mudanças valem na hora. No ar em **[lambda.adastratech.dev](https://lambda.adastratech.dev)**.
+
 ### Pré-requisitos
 
 - [Node.js](https://nodejs.org/) 18 ou superior (testado no 22)
+- **PostgreSQL** — o dev local usa uma instância descartável via Docker (`docker-compose.dev.yml`); veja *Instalação*
 - Uma aplicação de bot no [Discord Developer Portal](https://discord.com/developers/applications)
 
 ### Instalação
@@ -215,13 +228,16 @@ npm install
 
 # 2. Criar o .env (veja abaixo)
 
-# 3. Criar o banco SQLite a partir do schema do Prisma
+# 3. Subir um PostgreSQL local para dev (Docker)
+docker compose -f docker-compose.dev.yml up -d
+
+# 4. Sincronizar o schema do Prisma com o banco
 npm run db:push
 
-# 4. Registrar os slash commands no seu servidor
+# 5. Registrar os slash commands no seu servidor
 npm run deploy
 
-# 5. Rodar o bot (modo dev, com auto-reload)
+# 6. Rodar o bot (modo dev, com auto-reload)
 npm run dev
 ```
 
@@ -234,14 +250,14 @@ DISCORD_TOKEN=seu_token_do_bot
 CLIENT_ID=id_da_aplicacao
 GUILD_ID=id_do_servidor
 OWNER_ID=seu_id_de_usuario
-DATABASE_URL="file:./dev.db"
+DATABASE_URL="postgresql://lambda:lambda@localhost:5433/lambda?schema=public"
 ```
 
 - **DISCORD_TOKEN** — token do bot (Developer Portal → sua aplicação → *Bot* → *Reset Token*).
 - **CLIENT_ID** — *Application ID* (Developer Portal → *General Information*).
 - **GUILD_ID** — ID do servidor onde os comandos são registrados. Ative o *Modo Desenvolvedor* (Configurações → Avançado), botão direito no servidor → *Copiar ID do servidor*.
 - **OWNER_ID** — seu ID de usuário do Discord (o dono do bot). Ignora todas as checagens de permissão e libera recursos exclusivos do dono, como o `/kuro`. Botão direito no seu nome → *Copiar ID de usuário*.
-- **DATABASE_URL** — arquivo SQLite usado pelo Prisma (o padrão já serve).
+- **DATABASE_URL** — string de conexão do PostgreSQL. O `docker-compose.dev.yml` incluso sobe o Postgres na porta **5433** (usuário/senha/banco todos `lambda`), que é pra onde o padrão acima aponta.
 
 > O `.env` está no `.gitignore` e **nunca** deve ser commitado nem compartilhado — ele contém o token do bot.
 
@@ -262,7 +278,7 @@ https://discord.com/oauth2/authorize?client_id=SEU_CLIENT_ID&scope=bot%20applica
 | `npm start` | Roda o bot compilado (`dist/index.js`). |
 | `npm run deploy` | Registra/atualiza os slash commands no servidor. Rode após adicionar ou alterar a definição de um comando. |
 | `npm run deploy:prod` | Igual ao `deploy`, mas roda o script compilado do `dist/` — para produção/VPS (rode `npm run build` antes). |
-| `npm run db:push` | Sincroniza o schema do Prisma com o banco SQLite. |
+| `npm run db:push` | Sincroniza o schema do Prisma com o banco (PostgreSQL). |
 | `npm run db:studio` | Abre o Prisma Studio para inspecionar o banco. |
 | `npm run typecheck` | Faz a checagem de tipos sem gerar arquivos. |
 
@@ -289,6 +305,8 @@ src/
 └── deploy.ts        # script de registro dos slash commands
 prisma/
 └── schema.prisma    # todos os modelos (advertências, tickets, parcerias, sorteios, enquetes, logs, instagram, economia, loja, ...)
+web/
+└── src/             # dashboard web em Next.js (App Router, Auth.js + Discord OAuth, schema do Prisma compartilhado)
 ```
 
 **Como tudo se encaixa:** o `index.ts` chama o `app.ts`, que cria o client e roda os loaders. O `commandLoader` lê todos os arquivos sob `commands/`, registra cada comando e seus handlers de botão/modal (componentes). O `interactionCreate` roteia comandos slash pelo nome e interações de componentes pelo prefixo do customId (ex.: `embed:send` → o handler do componente `embed`). Tarefas em segundo plano (sorteios, enquetes, drops de economia, penalidades de warn) rodam em intervalos agendados a partir do evento `ready`.
